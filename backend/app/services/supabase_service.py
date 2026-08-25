@@ -1,0 +1,87 @@
+import mimetypes
+import logging
+from typing import Any, Dict, List, Optional
+from supabase import Client, create_client
+from app.config import Settings, get_settings
+
+logger = logging.getLogger(__name__)
+
+
+class SupabaseService:
+    def __init__(self, settings: Optional[Settings] = None):
+        self.settings = settings or get_settings()
+        self.client: Client = create_client(
+            self.settings.SUPABASE_URL,
+            self.settings.SUPABASE_SERVICE_ROLE_KEY,
+        )
+        self.bucket_name = self.settings.STORAGE_BUCKET
+
+    def fetch_image(self, storage_path: str) -> bytes:
+        """
+        Fetches an image file from Supabase Storage 'evidence-photos' bucket
+        using the service role key.
+
+        Args:
+            storage_path: The filename/path within the bucket.
+
+        Returns:
+            bytes: The downloaded image binary content.
+
+        Raises:
+            FileNotFoundError: If the file is not found in the bucket.
+            Exception: For other network or storage errors.
+        """
+        logger.info(f"Fetching image from bucket '{self.bucket_name}': {storage_path}")
+        try:
+            image_bytes = self.client.storage.from_(self.bucket_name).download(storage_path)
+            if not image_bytes:
+                raise FileNotFoundError(f"Storage object '{storage_path}' is empty or not found.")
+            return image_bytes
+        except Exception as exc:
+            err_msg = str(exc)
+            if "not_found" in err_msg.lower() or "404" in err_msg:
+                raise FileNotFoundError(f"Image '{storage_path}' not found in bucket '{self.bucket_name}'.") from exc
+            logger.error(f"Error downloading '{storage_path}' from bucket '{self.bucket_name}': {exc}")
+            raise
+
+    def get_mime_type(self, storage_path: str) -> str:
+        """Guesses MIME type from file extension, default to image/jpeg."""
+        mime_type, _ = mimetypes.guess_type(storage_path)
+        if not mime_type or not mime_type.startswith("image/"):
+            return "image/jpeg"
+        return mime_type
+
+    def save_scan_record(
+        self,
+        storage_path: str,
+        extracted: Dict[str, Any],
+        violations: List[Dict[str, Any]],
+        status: str,
+    ) -> Dict[str, Any]:
+        """
+        Inserts a row into the Supabase 'scans' table.
+
+        Args:
+            storage_path: Path of the image in storage bucket.
+            extracted: Dict representation of extracted label data.
+            violations: List of violation dicts.
+            status: Overall compliance status string.
+
+        Returns:
+            Dict[str, Any]: Inserted database record.
+        """
+        payload = {
+            "storage_path": storage_path,
+            "extracted": extracted,
+            "violations": violations,
+            "status": status,
+        }
+        logger.info(f"Saving scan record to 'scans' table for '{storage_path}' with status '{status}'")
+        try:
+            response = self.client.table("scans").insert(payload).execute()
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+            return payload
+        except Exception as exc:
+            logger.error(f"Error inserting scan record into Supabase: {exc}")
+            raise
