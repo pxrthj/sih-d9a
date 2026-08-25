@@ -53,16 +53,19 @@ class SupabaseService:
 
     def save_scan_record(
         self,
-        storage_path: str,
+        front_path: str,
+        back_path: str,
         extracted: Dict[str, Any],
         violations: List[Dict[str, Any]],
         status: str,
     ) -> Dict[str, Any]:
         """
-        Inserts a row into the Supabase 'scans' table.
+        Inserts a row into the Supabase 'scans' table storing front_path, back_path,
+        extracted data, violations, and status.
 
         Args:
-            storage_path: Path of the image in storage bucket.
+            front_path: Storage path of the front image.
+            back_path: Storage path of the back image.
             extracted: Dict representation of extracted label data.
             violations: List of violation dicts.
             status: Overall compliance status string.
@@ -70,18 +73,44 @@ class SupabaseService:
         Returns:
             Dict[str, Any]: Inserted database record.
         """
-        payload = {
-            "storage_path": storage_path,
+        combined_storage_path = f"{front_path} | {back_path}"
+        full_payload = {
+            "front_path": front_path,
+            "back_path": back_path,
+            "storage_path": combined_storage_path,
             "extracted": extracted,
             "violations": violations,
             "status": status,
         }
-        logger.info(f"Saving scan record to 'scans' table for '{storage_path}' with status '{status}'")
+
+        logger.info(
+            f"Saving scan record to 'scans' table for front='{front_path}', "
+            f"back='{back_path}' with status='{status}'"
+        )
+
         try:
-            response = self.client.table("scans").insert(payload).execute()
+            # First attempt inserting with dedicated front_path and back_path columns
+            response = self.client.table("scans").insert(full_payload).execute()
             if response.data and len(response.data) > 0:
                 return response.data[0]
-            return payload
+            return full_payload
         except Exception as exc:
+            err_msg = str(exc)
+            # Fallback if front_path / back_path columns are not yet added in the Supabase schema
+            if "PGRST204" in err_msg or "column" in err_msg.lower():
+                logger.warning(
+                    "Columns 'front_path'/'back_path' not found in 'scans' table schema cache. "
+                    "Falling back to 'storage_path' column."
+                )
+                fallback_payload = {
+                    "storage_path": combined_storage_path,
+                    "extracted": extracted,
+                    "violations": violations,
+                    "status": status,
+                }
+                response = self.client.table("scans").insert(fallback_payload).execute()
+                if response.data and len(response.data) > 0:
+                    return response.data[0]
+                return fallback_payload
             logger.error(f"Error inserting scan record into Supabase: {exc}")
             raise

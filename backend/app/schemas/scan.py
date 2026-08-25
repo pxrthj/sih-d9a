@@ -43,10 +43,15 @@ class ExtractedData(BaseModel):
 
 
 class ScanRequest(BaseModel):
-    storage_path: str = Field(
+    front_path: str = Field(
         ...,
-        description="Path/filename of the image in Supabase 'evidence-photos' bucket",
-        examples=["71zVrZaQucL._AC_UF894,1000_QL80_.jpg"]
+        description="Path/filename of the front image in Supabase 'evidence-photos' bucket",
+        examples=["front.jpeg"]
+    )
+    back_path: str = Field(
+        ...,
+        description="Path/filename of the back image in Supabase 'evidence-photos' bucket",
+        examples=["back.jpeg"]
     )
 
 
