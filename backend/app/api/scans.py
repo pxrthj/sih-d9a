@@ -38,6 +38,7 @@ def create_scan(
 ) -> ScanResponse:
     front_path = payload.front_path.strip()
     back_path = payload.back_path.strip()
+    user_id = payload.user_id.strip() if payload.user_id else None
 
     if not front_path or not back_path:
         raise HTTPException(
@@ -109,6 +110,7 @@ def create_scan(
             extracted=extracted_dict,
             violations=violations_dict,
             status=compliance_status,
+            user_id=user_id,
         )
     except Exception as exc:
         logger.error(f"Failed to write record to Supabase 'scans' table: {exc}")

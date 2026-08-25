@@ -53,6 +53,11 @@ class ScanRequest(BaseModel):
         description="Path/filename of the back image in Supabase 'evidence-photos' bucket",
         examples=["back.jpeg"]
     )
+    user_id: Optional[str] = Field(
+        default=None,
+        description="Supabase auth id of the officer who owns this scan",
+        examples=["a1b2c3d4-0000-0000-0000-000000000000"]
+    )
 
 
 class Violation(BaseModel):
