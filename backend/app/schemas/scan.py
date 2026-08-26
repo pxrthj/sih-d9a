@@ -16,6 +16,10 @@ class MRP(BaseModel):
 
 
 class ExtractedData(BaseModel):
+    product_name: Optional[str] = Field(
+        default=None,
+        description="Common or generic name of the commodity (e.g. 'Potato Chips', 'Toothpaste')"
+    )
     manufacturer_packer_importer: Optional[str] = Field(
         default=None,
         description="Name and complete address of the manufacturer, packer, or importer"

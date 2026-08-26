@@ -15,12 +15,13 @@ Analyze both images and extract all mandatory Legal Metrology declarations stric
 If a declaration appears on either the front or the back image (or across both), combine and extract each field's value from whichever image it appears on.
 
 Extraction Guidelines:
-1. `manufacturer_packer_importer`: The full name and complete address of the manufacturer, packer, or importer (e.g. 'Mfd. By: XYZ Ltd...'). Return null if not present.
-2. `net_quantity`: The net quantity with numeric/alphanumeric value (e.g., '100', '1.5', '50') and unit (e.g., 'g', 'GM', 'ml', 'kg', 'N', 'units'). Return null if not present.
-3. `mrp`: Maximum Retail Price. `value` is the price amount (e.g., 'Rs 50.00', '20.00'). `inclusive_of_taxes_stated` must be true only if words like 'inclusive of all taxes', 'incl. of all taxes', or 'all taxes included' are explicitly written on the package, false otherwise. Return null if no price is present.
-4. `mfg_or_pack_date`: Month and year (or date) of manufacture, packing, or import. Return null if not present.
-5. `consumer_care`: Contact details for consumer grievances/care including designation/name, address, telephone number, and/or email. Return null if not present.
-6. `declarations_present`: An array of strings identifying every declaration category found across both images (e.g. ['manufacturer_packer_importer', 'net_quantity', 'mrp', 'mfg_or_pack_date', 'consumer_care', 'ingredients', 'nutritional_information', 'batch_number']).
+1. `product_name`: The common or generic name of the commodity — its category descriptor, NOT the brand name (e.g. 'Potato Chips', 'Namkeen', 'Toothpaste', 'Biscuits'). Return null if not present.
+2. `manufacturer_packer_importer`: The full name and complete address of the manufacturer, packer, or importer (e.g. 'Mfd. By: XYZ Ltd...'). Return null if not present.
+3. `net_quantity`: The net quantity with numeric/alphanumeric value (e.g., '100', '1.5', '50') and unit (e.g., 'g', 'GM', 'ml', 'kg', 'N', 'units'). Return null if not present.
+4. `mrp`: Maximum Retail Price. `value` is the price amount (e.g., 'Rs 50.00', '20.00'). `inclusive_of_taxes_stated` must be true only if words like 'inclusive of all taxes', 'incl. of all taxes', or 'all taxes included' are explicitly written on the package, false otherwise. Return null if no price is present.
+5. `mfg_or_pack_date`: Month and year (or date) of manufacture, packing, or import. Return null if not present.
+6. `consumer_care`: Contact details for consumer grievances/care including designation/name, address, telephone number, and/or email. Return null if not present.
+7. `declarations_present`: An array of strings identifying every declaration category found across both images (e.g. ['product_name', 'manufacturer_packer_importer', 'net_quantity', 'mrp', 'mfg_or_pack_date', 'consumer_care', 'ingredients', 'nutritional_information', 'batch_number']).
 """
 
 
