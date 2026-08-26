@@ -62,6 +62,11 @@ class ScanRequest(BaseModel):
         description="Supabase auth id of the officer who owns this scan",
         examples=["a1b2c3d4-0000-0000-0000-000000000000"]
     )
+    category: Optional[str] = Field(
+        default=None,
+        description="Product category selected by the officer (e.g. 'General', 'Food & Beverages')",
+        examples=["General"]
+    )
 
 
 class Violation(BaseModel):

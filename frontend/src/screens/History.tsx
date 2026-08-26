@@ -108,6 +108,7 @@ export default function History() {
                   <div className="row__body">
                     <div className="row__title">{scanTitle(s.extracted)}</div>
                     <div className="row__meta">
+                      {s.category ? `${s.category} · ` : ''}
                       {formatDateShort(s.created_at)}
                       {vc > 0 ? ` · ${vc} violation${vc === 1 ? '' : 's'}` : ''}
                     </div>

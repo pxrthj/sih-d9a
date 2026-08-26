@@ -34,7 +34,7 @@ export function useScans(limit?: number): UseScansResult {
 
       let query = supabase
         .from('scans')
-        .select('id, created_at, storage_path, extracted, violations, status, user_id')
+        .select('id, created_at, storage_path, extracted, violations, status, user_id, category')
         .order('created_at', { ascending: false })
 
       if (!isAdmin) {
@@ -80,7 +80,7 @@ export function useScan(id: string | undefined) {
       setError(null)
       const { data, error: err } = await supabase
         .from('scans')
-        .select('id, created_at, storage_path, extracted, violations, status, user_id')
+        .select('id, created_at, storage_path, extracted, violations, status, user_id, category')
         .eq('id', id)
         .maybeSingle()
       if (!active) return

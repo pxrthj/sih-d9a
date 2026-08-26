@@ -5,6 +5,18 @@ import { createScan, uploadEvidencePhoto } from '../lib/api'
 import { Banner } from '../components/ui'
 import { CameraIcon, ScanIcon } from '../components/Icons'
 
+// Product categories the officer can tag a scan with. All categories run the
+// same 8 Legal Metrology rules today; this list is for classification/record.
+const PRODUCT_CATEGORIES = [
+  'General',
+  'Food & Beverages',
+  'Personal Care & Cosmetics',
+  'Household & Cleaning',
+  'Electronics & Appliances',
+  'Textiles & Garments',
+  'Other',
+] as const
+
 interface CaptureTileProps {
   label: string
   file: File | null
@@ -68,7 +80,7 @@ export default function NewScan() {
       ])
 
       setStage('Extracting declarations & checking rules…')
-      const result = await createScan({ frontPath, backPath, userId: user.id })
+      const result = await createScan({ frontPath, backPath, userId: user.id, category })
 
       navigate('/results', { state: { result } })
     } catch (e) {
@@ -139,9 +151,16 @@ export default function NewScan() {
           value={category}
           onChange={(e) => setCategory(e.target.value)}
         >
-          <option value="General">General</option>
+          {PRODUCT_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
         </select>
-        <p className="help">More category-specific rule sets will be added over time.</p>
+        <p className="help">
+          All categories currently run the same Legal Metrology checks; category is recorded with
+          each scan.
+        </p>
       </div>
 
       <button className="btn btn--primary btn--block" disabled={!canSubmit} onClick={handleScan}>

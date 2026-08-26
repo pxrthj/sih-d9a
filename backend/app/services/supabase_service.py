@@ -59,6 +59,7 @@ class SupabaseService:
         violations: List[Dict[str, Any]],
         status: str,
         user_id: Optional[str] = None,
+        category: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Inserts a row into the Supabase 'scans' table storing front_path, back_path,
@@ -85,6 +86,8 @@ class SupabaseService:
         }
         if user_id:
             full_payload["user_id"] = user_id
+        if category:
+            full_payload["category"] = category
 
         logger.info(
             f"Saving scan record to 'scans' table for front='{front_path}', "
@@ -113,6 +116,8 @@ class SupabaseService:
                 }
                 if user_id:
                     fallback_payload["user_id"] = user_id
+                if category:
+                    fallback_payload["category"] = category
                 response = self.client.table("scans").insert(fallback_payload).execute()
                 if response.data and len(response.data) > 0:
                     return response.data[0]

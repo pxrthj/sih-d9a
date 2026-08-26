@@ -45,9 +45,14 @@ export default function ScanDetail() {
               <h1 className="headline" style={{ fontSize: 21 }}>
                 {scanTitle(scan.extracted)}
               </h1>
-              <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-                {formatDateTime(scan.created_at)}
-              </p>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}
+              >
+                {scan.category && <span className="pill pill--neutral">{scan.category}</span>}
+                <span className="muted" style={{ fontSize: 13 }}>
+                  {formatDateTime(scan.created_at)}
+                </span>
+              </div>
             </div>
 
             <VerdictBanner status={scan.status} violationCount={violationCount(scan)} />

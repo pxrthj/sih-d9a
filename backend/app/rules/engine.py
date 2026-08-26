@@ -17,7 +17,7 @@ HOW TO EDIT (for non-programmers / the legal team):
   - To add/remove a rule, add/remove an entry in RULES.
 """
 
-from typing import Callable, List, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 from app.schemas.scan import ExtractedData, Violation
 
 
@@ -180,16 +180,39 @@ RULES: List[dict] = [
 ]
 
 
-def check_compliance_rules(extracted: ExtractedData) -> Tuple[List[Violation], str]:
+# ---------------------------------------------------------------------------
+# Per-category rules (future hook).
+#
+# Every product category currently runs the EXACT SAME 8 Legal Metrology rules
+# above. This mapping is intentionally EMPTY today — it exists only so real
+# category-specific Legal Metrology rules can be added later without touching
+# check_compliance_rules(). To add rules for a category later, map its name to a
+# list of extra rule dicts (same shape as RULES). Do NOT add FSSAI or other
+# non-Legal-Metrology rules here.
+# ---------------------------------------------------------------------------
+CATEGORY_RULES: Dict[str, List[dict]] = {}
+
+
+def check_compliance_rules(
+    extracted: ExtractedData,
+    category: Optional[str] = None,
+) -> Tuple[List[Violation], str]:
     """
     Evaluate the 8 Legal Metrology rules against extracted label data.
+
+    `category` is accepted so future per-category rules can be looked up, but
+    today every category runs the same 8 base checks (CATEGORY_RULES is empty).
 
     Returns:
         Tuple[List[Violation], str]: (violations_list, status_string)
     """
     violations: List[Violation] = []
 
-    for rule in RULES:
+    # Base rules run for every category, followed by any category-specific extras
+    # (none today — CATEGORY_RULES is empty by design).
+    applicable_rules = RULES + CATEGORY_RULES.get(category or "", [])
+
+    for rule in applicable_rules:
         passed = rule["check"](extracted)
         if not passed:
             violations.append(

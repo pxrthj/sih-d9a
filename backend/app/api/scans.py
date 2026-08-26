@@ -39,6 +39,7 @@ def create_scan(
     front_path = payload.front_path.strip()
     back_path = payload.back_path.strip()
     user_id = payload.user_id.strip() if payload.user_id else None
+    category = payload.category.strip() if payload.category else None
 
     if not front_path or not back_path:
         raise HTTPException(
@@ -97,8 +98,10 @@ def create_scan(
             detail=f"Gemini extraction failed: {str(exc)}",
         )
 
-    # 3. Run plain Python hardcoded rule checks (Rule-PLACEHOLDER-1, 2, 3)
-    violations, compliance_status = check_compliance_rules(extracted)
+    # 3. Run the deterministic Legal Metrology Rule 6 checks. Category is passed
+    #    through so future per-category rules can hook in; today every category
+    #    runs the exact same 8 checks.
+    violations, compliance_status = check_compliance_rules(extracted, category=category)
 
     # 4. Save record to Supabase 'scans' table
     try:
@@ -111,6 +114,7 @@ def create_scan(
             violations=violations_dict,
             status=compliance_status,
             user_id=user_id,
+            category=category,
         )
     except Exception as exc:
         logger.error(f"Failed to write record to Supabase 'scans' table: {exc}")

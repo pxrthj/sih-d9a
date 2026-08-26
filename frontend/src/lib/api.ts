@@ -32,6 +32,7 @@ export async function createScan(params: {
   frontPath: string
   backPath: string
   userId: string
+  category: string
 }): Promise<ScanResponse> {
   const res = await fetch(`${API_BASE_URL}/api/scans`, {
     method: 'POST',
@@ -40,6 +41,7 @@ export async function createScan(params: {
       front_path: params.frontPath,
       back_path: params.backPath,
       user_id: params.userId,
+      category: params.category,
     }),
   })
 

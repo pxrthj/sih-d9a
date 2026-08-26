@@ -44,6 +44,7 @@ export interface ScanRecord {
   violations: Violation[] | null
   status: string | null
   user_id?: string | null
+  category?: string | null
 }
 
 export type Role = 'admin' | 'officer' | 'none'
