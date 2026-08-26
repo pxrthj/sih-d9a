@@ -1,9 +1,9 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useScan } from '../hooks/useScans'
-import { VerdictBanner, ExtractedFields, ViolationList } from '../components/ScanResult'
+import { VerdictBanner, ExtractedFields, ViolationList, EvidencePhotos } from '../components/ScanResult'
 import { Banner, EmptyState, Spinner } from '../components/ui'
 import { ChevronLeft, InboxIcon } from '../components/Icons'
-import { formatDateTime, scanTitle, violationCount } from '../lib/format'
+import { evidencePaths, evidenceUrl, formatDateTime, scanTitle, violationCount } from '../lib/format'
 
 export default function ScanDetail() {
   const { id } = useParams<{ id: string }>()
@@ -56,6 +56,16 @@ export default function ScanDetail() {
             </div>
 
             <VerdictBanner status={scan.status} violationCount={violationCount(scan)} />
+
+            {(() => {
+              const paths = evidencePaths(scan)
+              return (
+                <div>
+                  <div className="section-label">Evidence photos</div>
+                  <EvidencePhotos front={evidenceUrl(paths.front)} back={evidenceUrl(paths.back)} />
+                </div>
+              )
+            })()}
 
             <div>
               <div className="section-label">Violations</div>

@@ -51,6 +51,30 @@ export function violationCount(scan: ScanRecord): number {
   return Array.isArray(scan.violations) ? scan.violations.length : 0
 }
 
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.replace(/\/$/, '') || ''
+
+/** Public URL for an evidence photo stored in the (public) evidence-photos bucket. */
+export function evidenceUrl(path?: string | null): string | null {
+  const clean = path?.trim()
+  if (!clean || !SUPABASE_URL) return null
+  return `${SUPABASE_URL}/storage/v1/object/public/evidence-photos/${encodeURIComponent(clean)}`
+}
+
+/**
+ * Resolve the front/back evidence filenames for a scan. Prefers explicit
+ * front_path/back_path if ever present; otherwise splits the combined
+ * storage_path ("front.jpg | back.jpg"). Older single-image rows yield front only.
+ */
+export function evidencePaths(scan: ScanRecord): { front: string | null; back: string | null } {
+  if (scan.front_path || scan.back_path) {
+    return { front: scan.front_path ?? null, back: scan.back_path ?? null }
+  }
+  const sp = scan.storage_path?.trim()
+  if (!sp) return { front: null, back: null }
+  const parts = sp.split('|').map((s) => s.trim()).filter(Boolean)
+  return { front: parts[0] ?? null, back: parts[1] ?? null }
+}
+
 /** Nicely spaced label for an extracted/violation field key. */
 export function fieldLabel(key: string): string {
   return key

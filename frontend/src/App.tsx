@@ -13,7 +13,7 @@ import Profile from './screens/Profile'
 import Users from './screens/Users'
 
 export default function App() {
-  const { session, loading, accessDenied } = useAuth()
+  const { session, loading, accessDenied, isAdmin } = useAuth()
 
   if (loading) {
     return <FullScreenLoader label="Loading ParakhMitra…" />
@@ -35,8 +35,10 @@ export default function App() {
       {/* Everything else shares the app shell + bottom nav */}
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/scan" element={<NewScan />} />
-        <Route path="/results" element={<Results />} />
+        {/* Scanning is officer-only. Admins are redirected to their dashboard,
+            even on direct-URL access. */}
+        <Route path="/scan" element={isAdmin ? <Navigate to="/" replace /> : <NewScan />} />
+        <Route path="/results" element={isAdmin ? <Navigate to="/" replace /> : <Results />} />
         <Route path="/history" element={<History />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/users" element={<Users />} />

@@ -36,10 +36,12 @@ export default function Dashboard() {
         </Banner>
       )}
 
-      {/* Primary action */}
-      <button className="btn btn--primary btn--block" onClick={() => navigate('/scan')}>
-        <ScanIcon size={20} /> New Compliance Scan
-      </button>
+      {/* Primary action — officers only; admins supervise and do not scan. */}
+      {!isAdmin && (
+        <button className="btn btn--primary btn--block" onClick={() => navigate('/scan')}>
+          <ScanIcon size={20} /> New Compliance Scan
+        </button>
+      )}
 
       {error && <Banner kind="error">Couldn’t load scans: {error}</Banner>}
 

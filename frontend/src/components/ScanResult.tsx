@@ -1,6 +1,41 @@
+import { useState } from 'react'
 import type { ExtractedData, Violation } from '../lib/types'
 import { fieldLabel, mrpText, netQuantityText } from '../lib/format'
-import { CheckIcon, AlertIcon } from './Icons'
+import { CheckIcon, AlertIcon, CameraIcon } from './Icons'
+
+function EvidenceTile({ label, url }: { label: string; url: string | null }) {
+  const [failed, setFailed] = useState(false)
+  const showImage = !!url && !failed
+  return (
+    <div className={`capture ${showImage ? 'capture--filled' : ''}`}>
+      <span className="capture__badge">{label}</span>
+      {showImage ? (
+        <img
+          className="capture__preview"
+          src={url!}
+          alt={label}
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span className="capture__hint">
+          <CameraIcon size={24} />
+          {url ? 'Image unavailable' : 'No photo'}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** Front + back evidence photos, shown read-only in the scan detail view. */
+export function EvidencePhotos({ front, back }: { front: string | null; back: string | null }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <EvidenceTile label="Front of Package" url={front} />
+      <EvidenceTile label="Back of Package" url={back} />
+    </div>
+  )
+}
 
 export function VerdictBanner({
   status,

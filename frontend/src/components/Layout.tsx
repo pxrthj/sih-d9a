@@ -39,16 +39,18 @@ function BottomNav() {
         History
       </NavLink>
 
-      {/* Center scan action */}
-      <NavLink
-        to="/scan"
-        className={`navitem navitem--fab ${location.pathname === '/scan' ? 'navitem--active' : ''}`}
-        aria-label="New scan"
-      >
-        <span className="navitem__fab">
-          <ScanIcon size={24} />
-        </span>
-      </NavLink>
+      {/* Center scan action — officers only. Admins are supervisors and do not scan. */}
+      {!isAdmin && (
+        <NavLink
+          to="/scan"
+          className={`navitem navitem--fab ${location.pathname === '/scan' ? 'navitem--active' : ''}`}
+          aria-label="New scan"
+        >
+          <span className="navitem__fab">
+            <ScanIcon size={24} />
+          </span>
+        </NavLink>
+      )}
 
       {isAdmin && (
         <NavLink
