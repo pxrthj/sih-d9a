@@ -1,5 +1,8 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+import time
+from collections import defaultdict
+from typing import Dict, List, Optional
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from app.schemas.scan import ScanRequest, ScanResponse
 from app.services.supabase_service import SupabaseService
 from app.services.gemini_service import GeminiService
@@ -20,6 +23,60 @@ def get_gemini_service(settings: Settings = Depends(get_settings)) -> GeminiServ
     return GeminiService(settings=settings)
 
 
+def get_current_user(
+    authorization: Optional[str] = Header(default=None),
+    supabase_service: SupabaseService = Depends(get_supabase_service),
+) -> Dict[str, Optional[str]]:
+    """
+    Authenticate the caller from the `Authorization: Bearer <token>` header,
+    validating the Supabase access token and confirming the user has an active,
+    authorised profile (officer or admin). Returns {id, email, role}.
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required.",
+        )
+    token = authorization[7:].strip()
+    user = supabase_service.get_user_from_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session. Please sign in again.",
+        )
+
+    profile = supabase_service.fetch_profile(user["id"])
+    if (
+        not profile
+        or profile.get("status") != "active"
+        or profile.get("role") not in ("officer", "admin")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is not authorised.",
+        )
+    return {"id": user["id"], "email": user.get("email"), "role": profile.get("role")}
+
+
+# --- Lightweight per-user rate limit on the (Gemini-billed) scan endpoint ---
+_SCAN_CALLS: Dict[str, List[float]] = defaultdict(list)
+_RATE_LIMIT_MAX = 20        # scans
+_RATE_LIMIT_WINDOW = 60.0   # per this many seconds, per user
+
+
+def _enforce_scan_rate_limit(user_id: str) -> None:
+    now = time.time()
+    cutoff = now - _RATE_LIMIT_WINDOW
+    calls = _SCAN_CALLS[user_id]
+    calls[:] = [t for t in calls if t > cutoff]
+    if len(calls) >= _RATE_LIMIT_MAX:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many scans in a short time. Please wait a moment and try again.",
+        )
+    calls.append(now)
+
+
 @router.post(
     "",
     response_model=ScanResponse,
@@ -34,12 +91,17 @@ def get_gemini_service(settings: Settings = Depends(get_settings)) -> GeminiServ
 @router.post("/", response_model=ScanResponse, include_in_schema=False)
 def create_scan(
     payload: ScanRequest,
+    current_user: Dict[str, Optional[str]] = Depends(get_current_user),
     supabase_service: SupabaseService = Depends(get_supabase_service),
     gemini_service: GeminiService = Depends(get_gemini_service),
 ) -> ScanResponse:
+    # Owner is derived from the authenticated token, NOT the request body — a
+    # client cannot attribute a scan to another user.
+    user_id = current_user["id"]
+    _enforce_scan_rate_limit(user_id)
+
     front_path = payload.front_path.strip()
     back_path = payload.back_path.strip()
-    user_id = payload.user_id.strip() if payload.user_id else None
     category = payload.category.strip() if payload.category else None
 
     if not front_path or not back_path:
@@ -57,13 +119,13 @@ def create_scan(
         logger.warning(f"Front image not found: {fnf_err}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Front image not found: {str(fnf_err)}",
+            detail="Front image not found in storage.",
         )
     except Exception as exc:
         logger.error(f"Failed to fetch front image from Supabase storage: {exc}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to retrieve front image from storage: {str(exc)}",
+            detail="Failed to retrieve the front image from storage.",
         )
 
     try:
@@ -72,13 +134,13 @@ def create_scan(
         logger.warning(f"Back image not found: {fnf_err}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Back image not found: {str(fnf_err)}",
+            detail="Back image not found in storage.",
         )
     except Exception as exc:
         logger.error(f"Failed to fetch back image from Supabase storage: {exc}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to retrieve back image from storage: {str(exc)}",
+            detail="Failed to retrieve the back image from storage.",
         )
 
     # 2. Detect mime types and extract declarations via Gemini API (gemini-3.5-flash) in a SINGLE call
@@ -96,7 +158,7 @@ def create_scan(
         logger.error(f"Gemini API extraction failed: {exc}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Gemini extraction failed: {str(exc)}",
+            detail="Label extraction is temporarily unavailable. Please try again.",
         )
 
     # 3. Run the deterministic Legal Metrology Rule 6 checks. Category is passed
@@ -121,7 +183,7 @@ def create_scan(
         logger.error(f"Failed to write record to Supabase 'scans' table: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to persist scan record: {str(exc)}",
+            detail="Failed to save the inspection record.",
         )
 
     # 5. Return extracted data and violations
@@ -161,6 +223,7 @@ def _split_storage_path(scan: dict) -> tuple[str | None, str | None]:
 )
 def download_improvement_notice(
     scan_id: str,
+    current_user: Dict[str, Optional[str]] = Depends(get_current_user),
     supabase_service: SupabaseService = Depends(get_supabase_service),
 ) -> Response:
     # 1. Fetch the immutable scan record (read-only)
@@ -170,13 +233,21 @@ def download_improvement_notice(
         logger.error(f"Failed to fetch scan '{scan_id}' for notice: {exc}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to fetch scan record: {str(exc)}",
+            detail="Failed to fetch the scan record.",
         )
 
     if not scan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Scan '{scan_id}' not found.",
+            detail="Scan not found.",
+        )
+
+    # 1b. Authorisation: only the scan's owner or an admin may download it
+    #     (mirrors the RLS scoping, which the service-role backend bypasses).
+    if scan.get("user_id") != current_user["id"] and current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorised to access this record.",
         )
 
     # 2. Officer attribution (name/email) from the profiles table
@@ -221,7 +292,7 @@ def download_improvement_notice(
         logger.error(f"Failed to generate notice PDF for scan '{scan_id}': {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate improvement notice: {str(exc)}",
+            detail="Failed to generate the improvement notice.",
         )
 
     filename = f"improvement-notice-{str(scan_id)[:8]}.pdf"

@@ -51,6 +51,24 @@ class SupabaseService:
             return "image/jpeg"
         return mime_type
 
+    def get_user_from_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """
+        Validate a Supabase access token (the JWT the frontend holds after login)
+        against the Supabase auth server and return the user id/email, or None if
+        the token is missing/invalid/expired. Used to authenticate API callers.
+        """
+        if not token:
+            return None
+        try:
+            resp = self.client.auth.get_user(token)
+        except Exception as exc:
+            logger.info(f"Access token validation failed: {exc}")
+            return None
+        user = getattr(resp, "user", None)
+        if not user or not getattr(user, "id", None):
+            return None
+        return {"id": user.id, "email": getattr(user, "email", None)}
+
     def fetch_scan(self, scan_id: str) -> Optional[Dict[str, Any]]:
         """Read a single scan record by id (read-only; used for report generation)."""
         response = self.client.table("scans").select("*").eq("id", scan_id).limit(1).execute()
@@ -59,12 +77,13 @@ class SupabaseService:
         return None
 
     def fetch_profile(self, user_id: Optional[str]) -> Optional[Dict[str, Any]]:
-        """Read a profile (name/email) by auth id, for officer attribution. Read-only."""
+        """Read a profile (name/email/role/status) by auth id. Read-only.
+        Used both for officer attribution and for authorising API callers."""
         if not user_id:
             return None
         response = (
             self.client.table("profiles")
-            .select("full_name, email")
+            .select("full_name, email, role, status")
             .eq("id", user_id)
             .limit(1)
             .execute()

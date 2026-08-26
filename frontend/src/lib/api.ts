@@ -5,6 +5,13 @@ const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
   'http://127.0.0.1:8000'
 
+/** Bearer header carrying the current Supabase session token, if signed in. */
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 /**
  * Uploads a single image to the Supabase Storage "evidence-photos" bucket
  * under a random `${uuid}.jpg` key and returns the stored object path.
@@ -36,7 +43,7 @@ export async function createScan(params: {
 }): Promise<ScanResponse> {
   const res = await fetch(`${API_BASE_URL}/api/scans`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({
       front_path: params.frontPath,
       back_path: params.backPath,
@@ -64,7 +71,9 @@ export async function createScan(params: {
  * Read-only — the backend generates the document from the immutable record.
  */
 export async function fetchImprovementNotice(scanId: string | number): Promise<Blob> {
-  const res = await fetch(`${API_BASE_URL}/api/scans/${scanId}/notice`)
+  const res = await fetch(`${API_BASE_URL}/api/scans/${scanId}/notice`, {
+    headers: await authHeaders(),
+  })
   if (!res.ok) {
     let detail = `Could not generate the notice (HTTP ${res.status})`
     try {
