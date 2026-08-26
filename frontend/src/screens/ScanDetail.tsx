@@ -1,9 +1,47 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useScan } from '../hooks/useScans'
+import { fetchImprovementNotice } from '../lib/api'
 import { VerdictBanner, ExtractedFields, ViolationList, EvidencePhotos } from '../components/ScanResult'
 import { Banner, EmptyState, Spinner } from '../components/ui'
-import { ChevronLeft, InboxIcon } from '../components/Icons'
+import { ChevronLeft, InboxIcon, DownloadIcon } from '../components/Icons'
 import { evidencePaths, evidenceUrl, formatDateTime, scanTitle, violationCount } from '../lib/format'
+
+/** Read-only action: downloads the generated Improvement Notice PDF. */
+function DownloadNoticeButton({ scanId }: { scanId: string | number }) {
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleDownload() {
+    setDownloading(true)
+    setError(null)
+    try {
+      const blob = await fetchImprovementNotice(scanId)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `improvement-notice-${String(scanId).slice(0, 8)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to download the notice.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <div className="stack-sm">
+      {error && <Banner kind="error">{error}</Banner>}
+      <button className="btn btn--primary btn--block" onClick={handleDownload} disabled={downloading}>
+        {downloading ? <Spinner /> : <DownloadIcon size={18} />}
+        {downloading ? 'Generating notice…' : 'Download Improvement Notice'}
+      </button>
+    </div>
+  )
+}
 
 export default function ScanDetail() {
   const { id } = useParams<{ id: string }>()
@@ -75,6 +113,11 @@ export default function ScanDetail() {
             <div>
               <div className="section-label">Extracted declarations</div>
               <ExtractedFields extracted={scan.extracted} />
+            </div>
+
+            <div>
+              <div className="section-label">Report</div>
+              <DownloadNoticeButton scanId={scan.id} />
             </div>
 
             <p className="muted" style={{ fontSize: 12, textAlign: 'center', lineHeight: 1.5 }}>

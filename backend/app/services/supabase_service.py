@@ -51,6 +51,28 @@ class SupabaseService:
             return "image/jpeg"
         return mime_type
 
+    def fetch_scan(self, scan_id: str) -> Optional[Dict[str, Any]]:
+        """Read a single scan record by id (read-only; used for report generation)."""
+        response = self.client.table("scans").select("*").eq("id", scan_id).limit(1).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return None
+
+    def fetch_profile(self, user_id: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Read a profile (name/email) by auth id, for officer attribution. Read-only."""
+        if not user_id:
+            return None
+        response = (
+            self.client.table("profiles")
+            .select("full_name, email")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return None
+
     def save_scan_record(
         self,
         front_path: str,

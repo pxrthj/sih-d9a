@@ -58,3 +58,22 @@ export async function createScan(params: {
 
   return (await res.json()) as ScanResponse
 }
+
+/**
+ * Fetches the generated Improvement Notice PDF for a scan as a Blob.
+ * Read-only — the backend generates the document from the immutable record.
+ */
+export async function fetchImprovementNotice(scanId: string | number): Promise<Blob> {
+  const res = await fetch(`${API_BASE_URL}/api/scans/${scanId}/notice`)
+  if (!res.ok) {
+    let detail = `Could not generate the notice (HTTP ${res.status})`
+    try {
+      const body = await res.json()
+      if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
+    } catch {
+      // not JSON; keep generic message
+    }
+    throw new Error(detail)
+  }
+  return res.blob()
+}

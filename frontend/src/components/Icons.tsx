@@ -114,6 +114,14 @@ export const ShieldIcon = ({ size = 24, className }: IconProps) => (
   </svg>
 )
 
+export const DownloadIcon = ({ size = 20, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="M7 10l5 5 5-5" />
+    <path d="M12 15V3" />
+  </svg>
+)
+
 export const InboxIcon = ({ size = 24, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <path d="M22 12h-6l-2 3h-4l-2-3H2" />
