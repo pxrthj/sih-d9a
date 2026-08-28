@@ -1,0 +1,4 @@
+# Test-only dependencies. The application itself needs nothing in this file —
+# it is deliberately separate so the deployed image stays lean.
+-r requirements.txt
+pytest>=8.0.0

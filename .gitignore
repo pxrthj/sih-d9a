@@ -1,8 +1,22 @@
+# Dependencies
 node_modules/
 venv/
-.env
-.env.local
-dist/
+venv*/
 __pycache__/
 *.pyc
+
+# Build output
+dist/
+
+# Local environment — never commit real keys
+.env
+.env.local
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# OS
 .DS_Store
+Thumbs.db

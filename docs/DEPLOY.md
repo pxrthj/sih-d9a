@@ -13,7 +13,7 @@ already configured (see [SETUP.md](SETUP.md)).
 ## 1. Backend → Render
 
 1. **Render Dashboard → New → Blueprint** → connect the GitHub repo `pxrthj/sih-d9a`.
-   Render reads [`render.yaml`](render.yaml) and proposes the **parakhmitra-backend** web service
+   Render reads [`render.yaml`](../render.yaml) and proposes the **parakhmitra-backend** web service
    (root dir `backend`, Python, free plan, start command already set).
 2. When prompted, fill the secret env vars (these are `sync:false`, so Render asks for them):
    - `SUPABASE_URL` — your Supabase project URL

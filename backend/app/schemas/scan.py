@@ -112,8 +112,8 @@ class ScanRequest(BaseModel):
     )
     # Legacy two-image fields, kept so an older frontend build keeps working
     # while a deploy rolls out. `resolved_paths()` prefers image_paths.
-    front_path: Optional[str] = Field(default=None, deprecated=True)
-    back_path: Optional[str] = Field(default=None, deprecated=True)
+    front_path: Optional[str] = Field(default=None, description="Deprecated: use image_paths")
+    back_path: Optional[str] = Field(default=None, description="Deprecated: use image_paths")
     user_id: Optional[str] = Field(
         default=None,
         description="Supabase auth id of the officer who owns this scan",

@@ -7,7 +7,7 @@ Everything you must configure outside the code, plus commands to run. Do this on
 ## 1. Run the database SQL
 
 Open **Supabase Dashboard → SQL Editor → New query**, paste the entire contents of
-[`supabase/schema.sql`](supabase/schema.sql), and **Run**.
+[`supabase/schema.sql`](../supabase/schema.sql), and **Run**.
 
 Before running, edit one line — the administrator allow-list:
 
