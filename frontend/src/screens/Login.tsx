@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { Banner, Spinner } from '../components/ui'
-import { ShieldIcon } from '../components/Icons'
+import logo from '../assets/logo.png'
 
 function GoogleGlyph() {
   return (
@@ -56,20 +56,17 @@ export default function Login() {
         }}
       >
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div
+          {/* Decorative: the wordmark below already names the app. */}
+          <img
+            src={logo}
+            alt=""
             style={{
-              width: 68,
-              height: 68,
-              borderRadius: 20,
-              background: 'rgba(255,255,255,0.12)',
-              border: '1px solid rgba(255,255,255,0.25)',
-              display: 'grid',
-              placeItems: 'center',
+              width: 96,
+              height: 96,
               marginBottom: 24,
+              filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.35))',
             }}
-          >
-            <ShieldIcon size={36} />
-          </div>
+          />
           <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
             ParakhMitra
           </h1>

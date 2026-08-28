@@ -1,15 +1,14 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { HomeIcon, HistoryIcon, ScanIcon, UsersIcon, ProfileIcon, ShieldIcon } from './Icons'
+import { HomeIcon, HistoryIcon, ScanIcon, UsersIcon, ProfileIcon } from './Icons'
+import logo from '../assets/logo.png'
 
 function AppBar() {
   const { isAdmin } = useAuth()
   return (
     <header className="appbar">
       <div className="appbar__brand">
-        <div className="appbar__seal">
-          <ShieldIcon size={20} />
-        </div>
+        <img className="appbar__logo" src={logo} alt="" />
         <div>
           <div className="appbar__title">ParakhMitra</div>
           <div className="appbar__subtitle">Legal Metrology Compliance</div>

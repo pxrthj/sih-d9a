@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="ParakhMitra" width="170" />
+</p>
+
 # ParakhMitra
 
 **Legal Metrology label compliance, checked from a photograph.**

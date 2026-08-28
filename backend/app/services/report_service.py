@@ -12,6 +12,7 @@ This module is READ-ONLY with respect to scan data. It never mutates a record.
 import base64
 import io
 import logging
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -74,7 +75,8 @@ NOTICE_HTML = """
 <body>
 
   <table class="bar"><tr>
-    <td><div class="title">ParakhMitra</div><div class="sub">Legal Metrology Compliance</div></td>
+    {% if logo_uri %}<td style="width:1.5cm; vertical-align:middle;"><img src="{{ logo_uri }}" style="width:1.25cm; height:1.25cm;" /></td>{% endif %}
+    <td style="vertical-align:middle;"><div class="title">ParakhMitra</div><div class="sub">Legal Metrology Compliance</div></td>
     <td style="text-align:right; vertical-align:top;">
       <div style="font-size:8pt; color:#b9c7dd;">NOTICE REF.</div>
       <div style="font-size:9.5pt; font-weight:bold;">{{ notice_ref }}</div>
@@ -185,6 +187,21 @@ NOTICE_HTML = """
 </html>
 """
 
+# The masthead logo, embedded as a data URI so the notice stays a single
+# self-contained file with no external requests. Flattened onto the header navy
+# rather than kept transparent: xhtml2pdf's PNG alpha handling is unreliable.
+def _load_logo_uri() -> Optional[str]:
+    path = Path(__file__).resolve().parent.parent / "assets" / "logo-notice.png"
+    try:
+        return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+    except Exception as exc:
+        logger.warning("Notice logo unavailable (%s); falling back to the wordmark.", exc)
+        return None
+
+
+LOGO_URI = _load_logo_uri()
+
+
 _env = Environment(loader=BaseLoader(), autoescape=select_autoescape(["html", "xml"]))
 _template = _env.from_string(NOTICE_HTML)
 
@@ -292,6 +309,7 @@ def generate_notice_pdf(
 
     now = datetime.now(timezone.utc)
     context = {
+        "logo_uri": LOGO_URI,
         "notice_ref": str(scan.get("id", "-")),
         "notice_date": now.strftime("%d %b %Y"),
         "inspection_date": _fmt_dt(scan.get("created_at"), with_time=True),
