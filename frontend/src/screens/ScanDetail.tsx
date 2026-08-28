@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useScan } from '../hooks/useScans'
 import { fetchEvidenceUrls, fetchImprovementNotice } from '../lib/api'
-import { VerdictBanner, ExtractedFields, ViolationList, EvidencePhotos } from '../components/ScanResult'
+import {
+  VerdictBanner,
+  ExtractedFields,
+  ViolationList,
+  AdvisoryList,
+  EvidencePhotos,
+} from '../components/ScanResult'
 import { Banner, EmptyState, Spinner } from '../components/ui'
 import { ChevronLeft, InboxIcon, DownloadIcon } from '../components/Icons'
 import { formatDateTime, scanTitle, violationCount } from '../lib/format'
@@ -13,10 +19,7 @@ import { formatDateTime, scanTitle, violationCount } from '../lib/format'
  * an admin) — the same rule that guards the notice.
  */
 function EvidenceSection({ scanId }: { scanId: string | number }) {
-  const [urls, setUrls] = useState<{ front: string | null; back: string | null }>({
-    front: null,
-    back: null,
-  })
+  const [urls, setUrls] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -38,7 +41,7 @@ function EvidenceSection({ scanId }: { scanId: string | number }) {
     <div>
       <div className="section-label">Evidence photos</div>
       {error && <Banner kind="error">{error}</Banner>}
-      <EvidencePhotos front={urls.front} back={urls.back} />
+      <EvidencePhotos urls={urls} />
     </div>
   )
 }
@@ -137,6 +140,8 @@ export default function ScanDetail() {
               <div className="section-label">Violations</div>
               <ViolationList violations={scan.violations} />
             </div>
+
+            <AdvisoryList advisories={scan.advisories} />
 
             <div>
               <div className="section-label">Extracted declarations</div>

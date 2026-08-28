@@ -1,13 +1,13 @@
 import logging
 import time
 from collections import defaultdict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
-from app.schemas.scan import ScanRequest, ScanResponse
+from app.schemas.scan import MAX_LABEL_IMAGES, ScanRequest, ScanResponse
 from app.services.supabase_service import SupabaseService
 from app.services.gemini_service import GeminiService
 from app.services.report_service import generate_notice_pdf
-from app.rules.engine import check_compliance_rules
+from app.rules.engine import build_advisories, check_compliance_rules
 from app.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
@@ -84,11 +84,12 @@ def _enforce_scan_rate_limit(user_id: str) -> None:
     "",
     response_model=ScanResponse,
     status_code=status.HTTP_200_OK,
-    summary="Process dual-sided product label scan",
+    summary="Process a multi-photo product label scan",
     description=(
-        "Fetches FRONT and BACK label photos from Supabase Storage 'evidence-photos', extracts Legal Metrology "
-        "declarations in a single call to the configured Gemini model with structured output, applies compliance rules, "
-        "persists results into Supabase 'scans' table, and returns extracted data and violations."
+        f"Fetches 1 to {MAX_LABEL_IMAGES} label photos from Supabase Storage 'evidence-photos', extracts "
+        "Legal Metrology declarations from all of them in a single call to the configured Gemini model "
+        "with structured output, applies the compliance rules, persists the result into the Supabase "
+        "'scans' table, and returns the extracted data, violations and advisories."
     ),
 )
 @router.post("/", response_model=ScanResponse, include_in_schema=False)
@@ -98,65 +99,49 @@ def create_scan(
     supabase_service: SupabaseService = Depends(get_supabase_service),
     gemini_service: GeminiService = Depends(get_gemini_service),
 ) -> ScanResponse:
-    # Owner is derived from the authenticated token, NOT the request body — a
+    # Owner is derived from the authenticated token, NOT the request body -- a
     # client cannot attribute a scan to another user.
     user_id = current_user["id"]
     _enforce_scan_rate_limit(user_id)
 
-    front_path = payload.front_path.strip()
-    back_path = payload.back_path.strip()
+    image_paths = payload.resolved_paths()
     category = payload.category.strip() if payload.category else None
 
-    if not front_path or not back_path:
+    if not image_paths:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Both 'front_path' and 'back_path' must be provided.",
+            detail="At least one label photo is required.",
+        )
+    if len(image_paths) > MAX_LABEL_IMAGES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"At most {MAX_LABEL_IMAGES} label photos can be scanned at once.",
         )
 
-    logger.info(f"Received dual scan request: front='{front_path}', back='{back_path}'")
+    logger.info(f"Received scan request with {len(image_paths)} image(s): {image_paths}")
 
-    # 1. Fetch BOTH images from Supabase Storage
+    # 1. Fetch every image from Supabase Storage, in the order captured.
+    images: List[Tuple[bytes, str]] = []
+    for index, path in enumerate(image_paths, start=1):
+        try:
+            image_bytes = supabase_service.fetch_image(path)
+        except FileNotFoundError as fnf_err:
+            logger.warning(f"Image {index} not found: {fnf_err}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Photo {index} was not found in storage.",
+            )
+        except Exception as exc:
+            logger.error(f"Failed to fetch image {index} from Supabase storage: {exc}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to retrieve photo {index} from storage.",
+            )
+        images.append((image_bytes, supabase_service.get_mime_type(path)))
+
+    # 2. Extract declarations from every image via the Gemini API in a SINGLE call
     try:
-        front_bytes = supabase_service.fetch_image(front_path)
-    except FileNotFoundError as fnf_err:
-        logger.warning(f"Front image not found: {fnf_err}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Front image not found in storage.",
-        )
-    except Exception as exc:
-        logger.error(f"Failed to fetch front image from Supabase storage: {exc}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to retrieve the front image from storage.",
-        )
-
-    try:
-        back_bytes = supabase_service.fetch_image(back_path)
-    except FileNotFoundError as fnf_err:
-        logger.warning(f"Back image not found: {fnf_err}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Back image not found in storage.",
-        )
-    except Exception as exc:
-        logger.error(f"Failed to fetch back image from Supabase storage: {exc}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to retrieve the back image from storage.",
-        )
-
-    # 2. Detect mime types and extract declarations via the Gemini API in a SINGLE call
-    front_mime = supabase_service.get_mime_type(front_path)
-    back_mime = supabase_service.get_mime_type(back_path)
-
-    try:
-        extracted = gemini_service.extract_label_data(
-            front_image_bytes=front_bytes,
-            back_image_bytes=back_bytes,
-            front_mime_type=front_mime,
-            back_mime_type=back_mime,
-        )
+        extracted = gemini_service.extract_label_data(images=images)
     except Exception as exc:
         logger.error(f"Gemini API extraction failed: {exc}")
         raise HTTPException(
@@ -169,15 +154,16 @@ def create_scan(
     #    runs the exact same 8 checks.
     violations, compliance_status = check_compliance_rules(extracted, category=category)
 
+    # 3b. Advisories are observations only -- they never change the status.
+    advisories = build_advisories(extracted, image_count=len(images))
+
     # 4. Save record to Supabase 'scans' table
     try:
-        extracted_dict = extracted.model_dump()
-        violations_dict = [v.model_dump() for v in violations]
         supabase_service.save_scan_record(
-            front_path=front_path,
-            back_path=back_path,
-            extracted=extracted_dict,
-            violations=violations_dict,
+            image_paths=image_paths,
+            extracted=extracted.model_dump(),
+            violations=[v.model_dump() for v in violations],
+            advisories=[a.model_dump() for a in advisories],
             status=compliance_status,
             user_id=user_id,
             category=category,
@@ -189,31 +175,27 @@ def create_scan(
             detail="Failed to save the inspection record.",
         )
 
-    # 5. Return extracted data and violations
+    # 5. Return extracted data, violations and advisories
     return ScanResponse(
         extracted=extracted,
         violations=violations,
+        advisories=advisories,
         status=compliance_status,
     )
 
 
-def _split_storage_path(scan: dict) -> tuple[str | None, str | None]:
-    """Resolve front/back evidence filenames from the scan row.
+def _image_paths(scan: dict) -> List[str]:
+    """Resolve the ordered evidence filenames for a scan row.
 
-    Prefers explicit front_path/back_path if present; otherwise splits the
-    combined storage_path ("front.jpg | back.jpg").
+    `storage_path` is the canonical store: a pipe-joined list of 1 to
+    MAX_LABEL_IMAGES filenames ("front.jpg | back.jpg | side.jpg"). The legacy
+    front_path/back_path columns are read only when it is empty.
     """
-    front = scan.get("front_path")
-    back = scan.get("back_path")
-    if front or back:
-        return front, back
     storage_path = (scan.get("storage_path") or "").strip()
-    if not storage_path:
-        return None, None
-    parts = [p.strip() for p in storage_path.split("|") if p.strip()]
-    front = parts[0] if len(parts) >= 1 else None
-    back = parts[1] if len(parts) >= 2 else None
-    return front, back
+    if storage_path:
+        return [p.strip() for p in storage_path.split("|") if p.strip()]
+    legacy = [scan.get("front_path"), scan.get("back_path")]
+    return [p.strip() for p in legacy if p and p.strip()]
 
 
 def _authorise_scan_access(
@@ -253,8 +235,8 @@ def _authorise_scan_access(
     "/{scan_id}/evidence",
     summary="Short-lived signed URLs for a scan's evidence photos",
     description=(
-        "Returns time-limited signed URLs for the FRONT and BACK evidence photos of an "
-        "existing scan. The bucket is private and the URLs are minted server-side with the "
+        "Returns time-limited signed URLs for every evidence photo of an existing scan, in "
+        "capture order. The bucket is private and the URLs are minted server-side with the "
         "service-role key, so this works without any storage read policy; access is "
         "authorised the same way as the notice (owner, or an admin). Read-only."
     ),
@@ -263,13 +245,13 @@ def get_scan_evidence(
     scan_id: str,
     current_user: Dict[str, Optional[str]] = Depends(get_current_user),
     supabase_service: SupabaseService = Depends(get_supabase_service),
-) -> Dict[str, Optional[str]]:
+) -> Dict[str, object]:
     scan = _authorise_scan_access(scan_id, current_user, supabase_service)
-    front_name, back_name = _split_storage_path(scan)
-    return {
-        "front": supabase_service.create_signed_url(front_name, _EVIDENCE_URL_TTL),
-        "back": supabase_service.create_signed_url(back_name, _EVIDENCE_URL_TTL),
-    }
+    images = [
+        {"path": path, "url": supabase_service.create_signed_url(path, _EVIDENCE_URL_TTL)}
+        for path in _image_paths(scan)
+    ]
+    return {"images": images}
 
 
 @router.get(
@@ -299,22 +281,15 @@ def download_improvement_notice(
     officer_name = (profile or {}).get("full_name") or (profile or {}).get("email") or "Unknown officer"
     officer_email = (profile or {}).get("email")
 
-    # 3. Fetch the two evidence images (best-effort; graceful placeholder if missing)
-    front_name, back_name = _split_storage_path(scan)
-    front_bytes = back_bytes = None
-    front_mime = back_mime = "image/jpeg"
-    if front_name:
+    # 3. Fetch every evidence image (best-effort; the notice still renders without them)
+    evidence: List[Tuple[bytes, str]] = []
+    for path in _image_paths(scan):
         try:
-            front_bytes = supabase_service.fetch_image(front_name)
-            front_mime = supabase_service.get_mime_type(front_name)
+            evidence.append(
+                (supabase_service.fetch_image(path), supabase_service.get_mime_type(path))
+            )
         except Exception as exc:
-            logger.warning(f"Front evidence image unavailable for scan '{scan_id}': {exc}")
-    if back_name:
-        try:
-            back_bytes = supabase_service.fetch_image(back_name)
-            back_mime = supabase_service.get_mime_type(back_name)
-        except Exception as exc:
-            logger.warning(f"Back evidence image unavailable for scan '{scan_id}': {exc}")
+            logger.warning(f"Evidence image '{path}' unavailable for scan '{scan_id}': {exc}")
 
     # 4. Render the notice PDF
     try:
@@ -322,10 +297,7 @@ def download_improvement_notice(
             scan=scan,
             officer_name=officer_name,
             officer_email=officer_email,
-            front_bytes=front_bytes,
-            back_bytes=back_bytes,
-            front_mime=front_mime,
-            back_mime=back_mime,
+            evidence=evidence,
         )
     except Exception as exc:
         logger.error(f"Failed to generate notice PDF for scan '{scan_id}': {exc}")

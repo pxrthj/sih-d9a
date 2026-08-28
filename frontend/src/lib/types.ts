@@ -12,14 +12,26 @@ export interface MRP {
   inclusive_of_taxes_stated: boolean
 }
 
+/** How the declarations are physically laid out — an observation, not a verdict. */
+export interface DeclarationBlock {
+  fields_in_block: string[]
+  stacked_together: boolean
+  print_size: string | null
+  legible_in_photo: boolean | null
+  location_note: string | null
+}
+
 export interface ExtractedData {
   product_name: string | null
   manufacturer_packer_importer: string | null
   net_quantity: NetQuantity | null
   mrp: MRP | null
   mfg_or_pack_date: string | null
+  use_by_date: string | null
+  lot_batch_number: string | null
   consumer_care: string | null
   declarations_present: string[]
+  declaration_block: DeclarationBlock | null
 }
 
 export interface Violation {
@@ -28,11 +40,25 @@ export interface Violation {
   rule_ref: string
 }
 
+/**
+ * A finding the officer should verify by hand. Advisories are NOT rule
+ * failures and never change the compliance status.
+ */
+export interface Advisory {
+  field: string
+  issue: string
+  rule_ref: string
+}
+
 export interface ScanResponse {
   extracted: ExtractedData
   violations: Violation[]
+  advisories?: Advisory[]
   status: string | null
 }
+
+/** Maximum label photos per scan; the backend enforces the same limit. */
+export const MAX_LABEL_IMAGES = 4
 
 // A row from the Supabase "scans" table.
 export interface ScanRecord {
@@ -43,6 +69,7 @@ export interface ScanRecord {
   storage_path?: string | null
   extracted: ExtractedData | null
   violations: Violation[] | null
+  advisories?: Advisory[] | null
   status: string | null
   user_id?: string | null
   category?: string | null

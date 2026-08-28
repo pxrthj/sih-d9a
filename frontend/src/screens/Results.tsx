@@ -1,6 +1,6 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import type { ScanResponse } from '../lib/types'
-import { VerdictBanner, ExtractedFields, ViolationList } from '../components/ScanResult'
+import { VerdictBanner, ExtractedFields, ViolationList, AdvisoryList } from '../components/ScanResult'
 import { HomeIcon, ScanIcon } from '../components/Icons'
 
 export default function Results() {
@@ -27,6 +27,8 @@ export default function Results() {
         <div className="section-label">Violations</div>
         <ViolationList violations={violations} />
       </div>
+
+      <AdvisoryList advisories={result.advisories} />
 
       <div>
         <div className="section-label">Extracted declarations</div>

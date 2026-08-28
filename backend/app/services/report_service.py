@@ -13,7 +13,7 @@ import base64
 import io
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from jinja2 import Environment, BaseLoader, select_autoescape
 from PIL import Image
@@ -93,6 +93,8 @@ NOTICE_HTML = """
     {% if product_name %}<tr><td class="k">Commodity</td><td class="v">{{ product_name }}</td></tr>{% endif %}
     {% if net_quantity %}<tr><td class="k">Declared net quantity</td><td class="v">{{ net_quantity }}</td></tr>{% endif %}
     {% if mrp %}<tr><td class="k">Declared MRP</td><td class="v">{{ mrp }}</td></tr>{% endif %}
+    {% if use_by_date %}<tr><td class="k">Use by / best before</td><td class="v">{{ use_by_date }}</td></tr>{% endif %}
+    {% if lot_batch_number %}<tr><td class="k">Lot / batch number</td><td class="v">{{ lot_batch_number }}</td></tr>{% endif %}
   </table>
 
   <div class="section-h">COMPLIANCE VERDICT</div>
@@ -119,18 +121,40 @@ NOTICE_HTML = """
   <div class="ok-box">No contraventions of the checked Legal Metrology declarations were observed on this package.</div>
   {% endif %}
 
+  {% if advisories %}
+  <div class="section-h">OBSERVATIONS FOR VERIFICATION</div>
+  <table class="vtable">
+    <tr><th style="width:24%">Subject</th><th>Observation</th><th style="width:22%">Reference</th></tr>
+    {% for a in advisories %}
+    <tr>
+      <td>{{ a.field_label }}</td>
+      <td>{{ a.issue }}</td>
+      <td class="rule">{{ a.rule_ref }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div class="cap" style="padding-top:4pt;">These observations are not findings of contravention. They
+  record matters that could not be adjudicated from the photographs and require verification against
+  the physical package.</div>
+  {% endif %}
+
   <div class="avoid-break">
   <div class="section-h">EVIDENCE ON RECORD</div>
+  {% if photo_rows %}
+  {% for row in photo_rows %}
   <table class="photos"><tr>
+    {% for photo in row %}
     <td>
-      {% if front_img %}<img class="photo-frame" src="{{ front_img }}" style="width:{{ front_w }}cm; height:{{ front_h }}cm" />{% else %}<div class="no-photo">Front photo unavailable</div>{% endif %}
-      <div class="cap">Front of Package</div>
+      <img class="photo-frame" src="{{ photo.uri }}" style="width:{{ photo.w }}cm; height:{{ photo.h }}cm" />
+      <div class="cap">{{ photo.caption }}</div>
     </td>
-    <td>
-      {% if back_img %}<img class="photo-frame" src="{{ back_img }}" style="width:{{ back_w }}cm; height:{{ back_h }}cm" />{% else %}<div class="no-photo">Back photo unavailable</div>{% endif %}
-      <div class="cap">Back of Package</div>
-    </td>
+    {% endfor %}
+    {% if row|length == 1 %}<td></td>{% endif %}
   </tr></table>
+  {% endfor %}
+  {% else %}
+  <div class="no-photo">Evidence photographs unavailable</div>
+  {% endif %}
   </div>
 
   <div class="section-h">NOTICE</div>
@@ -220,10 +244,7 @@ def generate_notice_pdf(
     scan: Dict[str, Any],
     officer_name: str,
     officer_email: Optional[str],
-    front_bytes: Optional[bytes],
-    back_bytes: Optional[bytes],
-    front_mime: str = "image/jpeg",
-    back_mime: str = "image/jpeg",
+    evidence: Optional[List[Tuple[bytes, str]]] = None,
     compliance_period: str = "30 days",
 ) -> bytes:
     """Render the Improvement Notice HTML and convert it to PDF bytes."""
@@ -252,8 +273,22 @@ def generate_notice_pdf(
         for v in raw_violations
     ]
 
-    front_uri, front_w, front_h = _prepare_evidence_image(front_bytes)
-    back_uri, back_w, back_h = _prepare_evidence_image(back_bytes)
+    advisories = [
+        {
+            "field_label": _field_label(str(a.get("field", ""))),
+            "issue": a.get("issue", ""),
+            "rule_ref": a.get("rule_ref", ""),
+        }
+        for a in (scan.get("advisories") or [])
+    ]
+
+    # Every available evidence photo, two per row.
+    photos = []
+    for index, (raw, _mime) in enumerate(evidence or [], start=1):
+        uri, width, height = _prepare_evidence_image(raw)
+        if uri:
+            photos.append({"uri": uri, "w": width, "h": height, "caption": f"Photo {index}"})
+    photo_rows = [photos[i:i + 2] for i in range(0, len(photos), 2)]
 
     now = datetime.now(timezone.utc)
     context = {
@@ -268,15 +303,13 @@ def generate_notice_pdf(
         "product_name": extracted.get("product_name"),
         "net_quantity": net_quantity_text,
         "mrp": mrp_text,
+        "use_by_date": extracted.get("use_by_date"),
+        "lot_batch_number": extracted.get("lot_batch_number"),
         "is_compliant": is_compliant,
         "status_label": "Compliant" if is_compliant else "Flagged",
         "violations": violations,
-        "front_img": front_uri,
-        "front_w": front_w,
-        "front_h": front_h,
-        "back_img": back_uri,
-        "back_w": back_w,
-        "back_h": back_h,
+        "advisories": advisories,
+        "photo_rows": photo_rows,
         "compliance_period": compliance_period,
     }
 

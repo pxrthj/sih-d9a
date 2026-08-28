@@ -15,10 +15,15 @@ HOW TO EDIT (for non-programmers / the legal team):
   - To change what counts as a valid unit, edit STANDARD_UNITS / UNIT_ALIASES /
     NON_STANDARD_UNITS below.
   - To add/remove a rule, add/remove an entry in RULES.
+
+ADVISORIES (see build_advisories at the bottom) are a SEPARATE, weaker output.
+They are observations for the officer to check by hand — never rule failures —
+and they never change the compliance status. Anything we can see in a photo but
+cannot adjudicate from one belongs there, not in RULES.
 """
 
 from typing import Callable, Dict, List, Optional, Tuple
-from app.schemas.scan import ExtractedData, Violation
+from app.schemas.scan import Advisory, ExtractedData, Violation
 
 
 # ---------------------------------------------------------------------------
@@ -225,3 +230,101 @@ def check_compliance_rules(
 
     status = "flagged" if violations else "compliant"
     return violations, status
+
+# ---------------------------------------------------------------------------
+# Advisories — observations, not verdicts.
+#
+# These never affect `status` and never appear in the violations list. They
+# exist for findings that are real and worth an officer's attention but cannot
+# be adjudicated from a photograph.
+# ---------------------------------------------------------------------------
+
+# Print sizes the extractor may report for a combined declaration block that we
+# treat as "smaller than the surrounding artwork".
+SMALL_PRINT_SIZES = {"small", "very_small", "verysmall", "tiny", "micro"}
+
+# NOTE FOR THE LEGAL TEAM: the Packaged Commodities Rules prescribe a minimum
+# height for declaration lettering (see the Rules' legibility provision and the
+# Second Schedule). Confirm the exact rule/schedule number before this string is
+# quoted in an issued notice — it is deliberately descriptive, not a citation.
+LEGIBILITY_REF = "LMPC 2011 — legibility of declarations"
+EVIDENCE_REF = "Evidence quality"
+COVERAGE_REF = "Evidence coverage"
+
+
+def _pretty(field_key: str) -> str:
+    """'lot_batch_number' -> 'Lot/batch number' for use in advisory prose."""
+    label = field_key.replace("_", " ").strip()
+    label = label.replace("mrp", "MRP").replace("lot batch number", "lot/batch number")
+    return label[:1].upper() + label[1:] if label else field_key
+
+
+def build_advisories(
+    extracted: ExtractedData,
+    image_count: int = 0,
+) -> List[Advisory]:
+    """
+    Observations for the officer, derived from what the extractor could see.
+
+    Args:
+        extracted: the extracted label data.
+        image_count: how many photographs the officer supplied.
+
+    Returns:
+        List[Advisory]: possibly empty. Never affects compliance status.
+    """
+    advisories: List[Advisory] = []
+
+    block = getattr(extracted, "declaration_block", None)
+    if block is not None:
+        size = (block.print_size or "").strip().lower().replace(" ", "_").replace("-", "_")
+        grouped = bool(block.stacked_together) and len(block.fields_in_block or []) >= 2
+
+        if size in SMALL_PRINT_SIZES:
+            where = f" ({block.location_note})" if block.location_note else ""
+            readable_size = size.replace("_", " ")
+            if grouped:
+                names = ", ".join(_pretty(f) for f in block.fields_in_block)
+                issue = (
+                    f"{names} are printed together in a single compact block in {readable_size} "
+                    f"type{where}. Grouping declarations in one place is permitted, but each must "
+                    "still meet the prescribed minimum letter height — measure it on the physical "
+                    "package before deciding."
+                )
+            else:
+                issue = (
+                    f"Declarations appear in {readable_size} type{where}. Verify the letter height "
+                    "against the prescribed minimum on the physical package."
+                )
+            advisories.append(
+                Advisory(field="declaration_block", issue=issue, rule_ref=LEGIBILITY_REF)
+            )
+
+        if block.legible_in_photo is False:
+            advisories.append(
+                Advisory(
+                    field="declaration_block",
+                    issue=(
+                        "The declaration block could not be read reliably from these photographs. "
+                        "Re-scan with a close-up of that block, or verify the values by hand before "
+                        "issuing a notice — a declaration that is present but unreadable here will "
+                        "be reported as missing."
+                    ),
+                    rule_ref=EVIDENCE_REF,
+                )
+            )
+
+    if 0 < image_count < 2:
+        advisories.append(
+            Advisory(
+                field="evidence",
+                issue=(
+                    "Only one photograph was supplied. A declaration printed on a panel that was "
+                    "not photographed is reported as missing — add the remaining panels if any "
+                    "violation below looks doubtful."
+                ),
+                rule_ref=COVERAGE_REF,
+            )
+        )
+
+    return advisories

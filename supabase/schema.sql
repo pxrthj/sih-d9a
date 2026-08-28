@@ -26,6 +26,13 @@ alter table public.scans
   add column if not exists front_path text,
   add column if not exists back_path  text;
 
+-- Advisories: observations for the officer that are NOT rule violations and do
+-- not affect the compliance status (e.g. declarations printed too small to
+-- adjudicate from a photograph). The backend degrades gracefully if this column
+-- is absent, but the advisories are then not persisted with the record.
+alter table public.scans
+  add column if not exists advisories jsonb not null default '[]'::jsonb;
+
 -- ---------------------------------------------------------------------------
 -- 2. profiles table
 -- ---------------------------------------------------------------------------

@@ -31,8 +31,11 @@ class Settings(BaseModel):
     SUPABASE_URL: str = Field(default_factory=lambda: os.getenv("SUPABASE_URL", ""))
     SUPABASE_SERVICE_ROLE_KEY: str = Field(default_factory=lambda: os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""))
     GEMINI_API_KEY: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
+    # Flash rather than Flash-Lite: the small, low-contrast ink-jet MRP/batch
+    # blocks on real packaging are exactly where the lite tier loses text.
+    # Set GEMINI_MODEL to override (e.g. back to gemini-3.5-flash-lite for cost).
     GEMINI_MODEL: str = Field(
-        default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+        default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
     )
     STORAGE_BUCKET: str = Field(default="evidence-photos")
     CORS_ORIGINS: List[str] = Field(default_factory=_parse_cors_origins)

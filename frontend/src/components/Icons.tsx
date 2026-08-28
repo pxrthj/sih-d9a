@@ -92,6 +92,14 @@ export const AlertIcon = ({ size = 24, className }: IconProps) => (
   </svg>
 )
 
+export const InfoIcon = ({ size = 20, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </svg>
+)
+
 export const SearchIcon = ({ size = 20, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <circle cx="11" cy="11" r="8" />

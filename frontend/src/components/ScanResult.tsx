@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import type { ExtractedData, Violation } from '../lib/types'
+import type { Advisory, ExtractedData, Violation } from '../lib/types'
 import { fieldLabel, mrpText, netQuantityText } from '../lib/format'
-import { CheckIcon, AlertIcon, CameraIcon } from './Icons'
+import { CheckIcon, AlertIcon, CameraIcon, InfoIcon } from './Icons'
 
 function EvidenceTile({ label, url }: { label: string; url: string | null }) {
   const [failed, setFailed] = useState(false)
@@ -27,12 +27,23 @@ function EvidenceTile({ label, url }: { label: string; url: string | null }) {
   )
 }
 
-/** Front + back evidence photos, shown read-only in the scan detail view. */
-export function EvidencePhotos({ front, back }: { front: string | null; back: string | null }) {
+/** Suggested purpose of each capture slot, mirrored from the scan screen. */
+const PHOTO_LABELS = ['Front', 'Back', 'Side / base', 'Close-up']
+
+/** Every evidence photo for a record, read-only, in capture order. */
+export function EvidencePhotos({ urls }: { urls: string[] }) {
+  if (urls.length === 0) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <EvidenceTile label="Photo 1" url={null} />
+      </div>
+    )
+  }
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-      <EvidenceTile label="Front of Package" url={front} />
-      <EvidenceTile label="Back of Package" url={back} />
+      {urls.map((url, i) => (
+        <EvidenceTile key={url} label={PHOTO_LABELS[i] ?? `Photo ${i + 1}`} url={url} />
+      ))}
     </div>
   )
 }
@@ -109,6 +120,8 @@ export function ExtractedFields({ extracted }: { extracted: ExtractedData | null
         </div>
       </div>
       <Field label="Mfg / Pack Date" value={extracted.mfg_or_pack_date} />
+      <Field label="Use By / Best Before" value={extracted.use_by_date} />
+      <Field label="Lot / Batch Number" value={extracted.lot_batch_number} />
       <Field label="Consumer Care" value={extracted.consumer_care} />
       <div className="field">
         <div className="field__label">Declarations Present</div>
@@ -157,6 +170,48 @@ export function ViolationList({ violations }: { violations: Violation[] | null }
           <span className="violation__ref">{v.rule_ref}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+/**
+ * Observations for the officer to verify by hand. These are NOT rule failures
+ * and never change the compliance verdict, so they are styled apart from
+ * violations and always say so.
+ */
+export function AdvisoryList({ advisories }: { advisories: Advisory[] | null | undefined }) {
+  if (!advisories || advisories.length === 0) return null
+
+  return (
+    <div>
+      <div className="section-label">Observations to verify</div>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {advisories.map((a, i) => (
+          <div
+            key={`${a.field}-${i}`}
+            style={{
+              display: 'flex',
+              gap: 12,
+              padding: '14px 16px',
+              borderTop: i === 0 ? 'none' : '1px solid var(--outline-variant)',
+            }}
+          >
+            <span style={{ color: 'var(--compliance-warning, #B45309)', flexShrink: 0, marginTop: 1 }}>
+              <InfoIcon size={18} />
+            </span>
+            <div>
+              <div style={{ fontSize: 14.5, lineHeight: 1.5 }}>{a.issue}</div>
+              <span className="violation__ref" style={{ marginTop: 8, display: 'inline-block' }}>
+                {a.rule_ref}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="help">
+        Not violations. These could not be decided from the photographs and need checking against
+        the physical package.
+      </p>
     </div>
   )
 }

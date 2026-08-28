@@ -48,16 +48,13 @@ export async function uploadEvidencePhoto(file: File): Promise<string> {
 }
 
 /**
- * Short-lived signed URLs for a scan's two evidence photos.
+ * Short-lived signed URLs for a scan's evidence photos, in capture order.
  *
  * The bucket is private and has no client read policy, so the URLs are minted
  * by the backend with its service-role key after it checks the same
- * owner-or-admin rule as the notice. Returns nulls if the record has no
- * evidence or the request fails.
+ * owner-or-admin rule as the notice.
  */
-export async function fetchEvidenceUrls(
-  scanId: string | number,
-): Promise<{ front: string | null; back: string | null }> {
+export async function fetchEvidenceUrls(scanId: string | number): Promise<string[]> {
   const res = await fetch(`${API_BASE_URL}/api/scans/${scanId}/evidence`, {
     headers: await authHeaders(),
   })
@@ -71,18 +68,25 @@ export async function fetchEvidenceUrls(
     }
     throw new Error(`Could not load evidence photos (${detail})`)
   }
-  const body = (await res.json()) as { front?: string | null; back?: string | null }
-  return { front: body.front ?? null, back: body.back ?? null }
+  const body = (await res.json()) as {
+    images?: { path?: string; url?: string | null }[]
+    // tolerated so a newer frontend still works against an older backend
+    front?: string | null
+    back?: string | null
+  }
+  if (Array.isArray(body.images)) {
+    return body.images.map((i) => i.url).filter((u): u is string => !!u)
+  }
+  return [body.front, body.back].filter((u): u is string => !!u)
 }
 
 /**
- * Calls the backend scan pipeline. The backend fetches both images from
+ * Calls the backend scan pipeline. The backend fetches every image from
  * storage, runs Gemini extraction + the rule engine, persists the record
- * (owned by user_id), and returns the extraction + violations + status.
+ * (owned by user_id), and returns the extraction, violations and advisories.
  */
 export async function createScan(params: {
-  frontPath: string
-  backPath: string
+  imagePaths: string[]
   userId: string
   category: string
 }): Promise<ScanResponse> {
@@ -90,8 +94,7 @@ export async function createScan(params: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({
-      front_path: params.frontPath,
-      back_path: params.backPath,
+      image_paths: params.imagePaths,
       user_id: params.userId,
       category: params.category,
     }),

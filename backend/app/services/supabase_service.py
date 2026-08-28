@@ -116,74 +116,85 @@ class SupabaseService:
 
     def save_scan_record(
         self,
-        front_path: str,
-        back_path: str,
+        image_paths: List[str],
         extracted: Dict[str, Any],
         violations: List[Dict[str, Any]],
         status: str,
+        advisories: Optional[List[Dict[str, Any]]] = None,
         user_id: Optional[str] = None,
         category: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Inserts a row into the Supabase 'scans' table storing front_path, back_path,
-        extracted data, violations, and status.
+        Insert a row into the Supabase 'scans' table.
 
-        Args:
-            front_path: Storage path of the front image.
-            back_path: Storage path of the back image.
-            extracted: Dict representation of extracted label data.
-            violations: List of violation dicts.
-            status: Overall compliance status string.
+        `storage_path` is the canonical record of the evidence photos: the 1 to 4
+        filenames pipe-joined in capture order ("front.jpg | back.jpg | side.jpg").
+        front_path/back_path are also written, for the first two images only, so
+        older readers keep working.
+
+        Optional columns (front_path, back_path, advisories, category) may not
+        exist in a project whose schema.sql has not been re-run; a column error
+        triggers one retry with only the core columns.
 
         Returns:
-            Dict[str, Any]: Inserted database record.
+            Dict[str, Any]: the inserted database record.
         """
-        combined_storage_path = f"{front_path} | {back_path}"
-        full_payload = {
-            "front_path": front_path,
-            "back_path": back_path,
+        combined_storage_path = " | ".join(image_paths)
+        core_payload: Dict[str, Any] = {
             "storage_path": combined_storage_path,
             "extracted": extracted,
             "violations": violations,
             "status": status,
         }
         if user_id:
-            full_payload["user_id"] = user_id
+            core_payload["user_id"] = user_id
+
+        optional_payload: Dict[str, Any] = {}
+        if len(image_paths) >= 1:
+            optional_payload["front_path"] = image_paths[0]
+        if len(image_paths) >= 2:
+            optional_payload["back_path"] = image_paths[1]
+        if advisories is not None:
+            optional_payload["advisories"] = advisories
         if category:
-            full_payload["category"] = category
+            optional_payload["category"] = category
 
         logger.info(
-            f"Saving scan record to 'scans' table for front='{front_path}', "
-            f"back='{back_path}' with status='{status}'"
+            f"Saving scan record with {len(image_paths)} image(s) and status='{status}'"
         )
 
-        try:
-            # First attempt inserting with dedicated front_path and back_path columns
-            response = self.client.table("scans").insert(full_payload).execute()
-            if response.data and len(response.data) > 0:
-                return response.data[0]
-            return full_payload
-        except Exception as exc:
-            err_msg = str(exc)
-            # Fallback if front_path / back_path columns are not yet added in the Supabase schema
-            if "PGRST204" in err_msg or "column" in err_msg.lower():
-                logger.warning(
-                    "Columns 'front_path'/'back_path' not found in 'scans' table schema cache. "
-                    "Falling back to 'storage_path' column."
-                )
-                fallback_payload = {
-                    "storage_path": combined_storage_path,
-                    "extracted": extracted,
-                    "violations": violations,
-                    "status": status,
-                }
-                if user_id:
-                    fallback_payload["user_id"] = user_id
-                if category:
-                    fallback_payload["category"] = category
-                response = self.client.table("scans").insert(fallback_payload).execute()
+        # Insert, dropping any optional column this project's schema does not have
+        # yet. Only the named column is dropped, so a missing `advisories` cannot
+        # cost the record its `category`.
+        payload = {**core_payload, **optional_payload}
+        for _ in range(len(optional_payload) + 1):
+            try:
+                response = self.client.table("scans").insert(payload).execute()
                 if response.data and len(response.data) > 0:
                     return response.data[0]
-                return fallback_payload
-            logger.error(f"Error inserting scan record into Supabase: {exc}")
-            raise
+                return payload
+            except Exception as exc:
+                err_msg = str(exc)
+                if "PGRST204" not in err_msg and "column" not in err_msg.lower():
+                    logger.error(f"Error inserting scan record into Supabase: {exc}")
+                    raise
+                missing = next(
+                    (key for key in optional_payload if key in payload and key in err_msg), None
+                )
+                if not missing:
+                    logger.warning(
+                        f"Unrecognised column error inserting scan record ({err_msg}). "
+                        "Retrying with the core columns only."
+                    )
+                    payload = dict(core_payload)
+                    continue
+                logger.warning(
+                    f"Column '{missing}' is missing from the 'scans' table; dropping it and "
+                    "retrying. Re-run supabase/schema.sql to persist it."
+                )
+                payload.pop(missing, None)
+
+        response = self.client.table("scans").insert(core_payload).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return core_payload

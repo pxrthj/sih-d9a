@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { createScan, uploadEvidencePhoto } from '../lib/api'
+import { MAX_LABEL_IMAGES } from '../lib/types'
 import { Banner } from '../components/ui'
 import { CameraIcon, ScanIcon } from '../components/Icons'
 
@@ -17,35 +18,73 @@ const PRODUCT_CATEGORIES = [
   'Other',
 ] as const
 
+// Suggested purpose for each slot. Only the first photo is required — the rest
+// exist for packs that carry declarations on more than two panels, or for a
+// close-up of a small print block.
+const SLOT_HINTS = ['Front', 'Back', 'Side / base', 'Close-up'] as const
+
 interface CaptureTileProps {
   label: string
-  file: File | null
-  onPick: (file: File | null) => void
+  file: File
+  onReplace: (file: File | null) => void
+  onRemove: () => void
 }
 
-function CaptureTile({ label, file, onPick }: CaptureTileProps) {
+function CaptureTile({ label, file, onReplace, onRemove }: CaptureTileProps) {
   // Derive an object URL for the preview; revoke it when the file changes/unmounts.
-  const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
+  const preview = useMemo(() => URL.createObjectURL(file), [file])
   useEffect(() => {
-    return () => {
-      if (preview) URL.revokeObjectURL(preview)
-    }
+    return () => URL.revokeObjectURL(preview)
   }, [preview])
 
   return (
-    <label className={`capture ${file ? 'capture--filled' : ''}`}>
+    <div className="capture capture--filled">
       <span className="capture__badge">{label}</span>
-      {file && preview ? (
-        <>
-          <img className="capture__preview" src={preview} alt={`${label} preview`} />
-          <span className="capture__change">Change</span>
-        </>
-      ) : (
-        <span className="capture__hint">
-          <CameraIcon size={26} />
-          Tap to add photo
-        </span>
-      )}
+      <img className="capture__preview" src={preview} alt={`${label} preview`} />
+      <label className="capture__change" style={{ cursor: 'pointer' }}>
+        Change
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+          onChange={(e) => onReplace(e.target.files?.[0] ?? null)}
+        />
+      </label>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${label}`}
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          width: 26,
+          height: 26,
+          borderRadius: '50%',
+          border: 'none',
+          background: 'rgba(255,255,255,0.92)',
+          color: 'var(--compliance-error, #991B1B)',
+          fontSize: 15,
+          fontWeight: 700,
+          lineHeight: 1,
+          cursor: 'pointer',
+        }}
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+function AddTile({ label, onPick }: { label: string; onPick: (file: File | null) => void }) {
+  return (
+    <label className="capture">
+      <span className="capture__badge">{label}</span>
+      <span className="capture__hint">
+        <CameraIcon size={26} />
+        Tap to add photo
+      </span>
       <input
         type="file"
         accept="image/*"
@@ -59,28 +98,44 @@ function CaptureTile({ label, file, onPick }: CaptureTileProps) {
 export default function NewScan() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [front, setFront] = useState<File | null>(null)
-  const [back, setBack] = useState<File | null>(null)
+  const [photos, setPhotos] = useState<File[]>([])
   const [category, setCategory] = useState('General')
   const [submitting, setSubmitting] = useState(false)
   const [stage, setStage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
 
-  const canSubmit = !!front && !!back && !!user && !submitting
+  const canAddMore = photos.length < MAX_LABEL_IMAGES
+  const canSubmit = photos.length > 0 && !!user && !submitting
+
+  function addPhoto(file: File | null) {
+    if (!file) return
+    setPhotos((prev) => (prev.length >= MAX_LABEL_IMAGES ? prev : [...prev, file]))
+  }
+
+  function replacePhoto(index: number, file: File | null) {
+    if (!file) return
+    setPhotos((prev) => prev.map((p, i) => (i === index ? file : p)))
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((prev) => prev.filter((_, i) => i !== index))
+  }
 
   async function handleScan() {
-    if (!front || !back || !user) return
+    if (photos.length === 0 || !user) return
     setSubmitting(true)
     setError(null)
     try {
-      setStage('Uploading package photos…')
-      const [frontPath, backPath] = await Promise.all([
-        uploadEvidencePhoto(front),
-        uploadEvidencePhoto(back),
-      ])
+      setStage(
+        photos.length === 1
+          ? 'Uploading package photo…'
+          : `Uploading ${photos.length} package photos…`,
+      )
+      // Upload in parallel, but keep the officer's capture order.
+      const imagePaths = await Promise.all(photos.map((file) => uploadEvidencePhoto(file)))
 
       setStage('Extracting declarations & checking rules…')
-      const result = await createScan({ frontPath, backPath, userId: user.id, category })
+      const result = await createScan({ imagePaths, userId: user.id, category })
 
       navigate('/results', { state: { result } })
     } catch (e) {
@@ -126,19 +181,45 @@ export default function NewScan() {
       <div>
         <h1 className="headline">New Scan</h1>
         <p className="muted" style={{ fontSize: 14, marginTop: 4 }}>
-          Capture both sides of the package for a Legal Metrology compliance check.
+          Capture every panel that carries a declaration, for a Legal Metrology compliance check.
         </p>
       </div>
 
       {error && <Banner kind="error">{error}</Banner>}
 
       <div>
-        <div className="section-label">Package photos</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <CaptureTile label="Front" file={front} onPick={setFront} />
-          <CaptureTile label="Back" file={back} onPick={setBack} />
+        <div className="flex-between" style={{ marginBottom: 10 }}>
+          <div className="section-label" style={{ margin: 0 }}>
+            Package photos
+          </div>
+          <span className="muted" style={{ fontSize: 12.5, fontWeight: 600 }}>
+            {photos.length} of {MAX_LABEL_IMAGES}
+          </span>
         </div>
-        <p className="help">Front and back are both required. Photos are stored as inspection evidence.</p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {photos.map((file, index) => (
+            <CaptureTile
+              key={`${file.name}-${file.lastModified}-${index}`}
+              label={SLOT_HINTS[index] ?? `Photo ${index + 1}`}
+              file={file}
+              onReplace={(f) => replacePhoto(index, f)}
+              onRemove={() => removePhoto(index)}
+            />
+          ))}
+          {canAddMore && (
+            <AddTile
+              label={photos.length === 0 ? 'Front' : `Add ${SLOT_HINTS[photos.length] ?? 'photo'}`}
+              onPick={addPhoto}
+            />
+          )}
+        </div>
+
+        <p className="help">
+          One photo is enough to scan, but a declaration on a panel you don&rsquo;t photograph is
+          reported as missing. Add up to {MAX_LABEL_IMAGES} &mdash; and if the MRP, use-by date and
+          lot number are crammed into one tiny box, add a close-up of it.
+        </p>
       </div>
 
       <div>
