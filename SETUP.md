@@ -23,8 +23,8 @@ This single script:
   `…@ves.ac.in` → `officer`, everyone else → `none`/no access),
 - enables RLS so **scan records are immutable** (no client can edit or delete them; officers
   see only their own scans, admins see all),
-- creates the private `evidence-photos` storage bucket, an upload policy, and a read policy
-  scoped to the uploading officer (admins see all) so the app can mint short-lived signed URLs.
+- creates the private `evidence-photos` storage bucket with an upload policy (the app never
+  reads it directly — the backend mints short-lived signed URLs with the service-role key).
 
 > Roles live in `profiles` after creation — an admin can change any user's role/status from the
 > in-app **Users** screen.

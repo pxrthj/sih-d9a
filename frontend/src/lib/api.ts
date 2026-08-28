@@ -50,30 +50,29 @@ export async function uploadEvidencePhoto(file: File): Promise<string> {
 /**
  * Short-lived signed URLs for a scan's two evidence photos.
  *
- * The bucket is private, so there is no public URL to link to — a signed URL is
- * minted per view and expires. Returns null for a path that is missing or that
- * the signed-in user is not allowed to read.
+ * The bucket is private and has no client read policy, so the URLs are minted
+ * by the backend with its service-role key after it checks the same
+ * owner-or-admin rule as the notice. Returns nulls if the record has no
+ * evidence or the request fails.
  */
-export async function evidenceSignedUrls(
-  front: string | null,
-  back: string | null,
-  expiresInSeconds = 3600,
+export async function fetchEvidenceUrls(
+  scanId: string | number,
 ): Promise<{ front: string | null; back: string | null }> {
-  const sign = async (path: string | null): Promise<string | null> => {
-    const clean = path?.trim()
-    if (!clean) return null
-    const { data, error } = await supabase.storage
-      .from(EVIDENCE_BUCKET)
-      .createSignedUrl(clean, expiresInSeconds)
-    if (error) {
-      console.warn(`Could not sign evidence photo "${clean}": ${error.message}`)
-      return null
+  const res = await fetch(`${API_BASE_URL}/api/scans/${scanId}/evidence`, {
+    headers: await authHeaders(),
+  })
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`
+    try {
+      const body = await res.json()
+      if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
+    } catch {
+      // not JSON; keep the status code
     }
-    return data?.signedUrl ?? null
+    throw new Error(`Could not load evidence photos (${detail})`)
   }
-
-  const [frontUrl, backUrl] = await Promise.all([sign(front), sign(back)])
-  return { front: frontUrl, back: backUrl }
+  const body = (await res.json()) as { front?: string | null; back?: string | null }
+  return { front: body.front ?? null, back: body.back ?? null }
 }
 
 /**

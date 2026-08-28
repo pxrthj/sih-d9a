@@ -1,37 +1,43 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useScan } from '../hooks/useScans'
-import type { ScanRecord } from '../lib/types'
-import { evidenceSignedUrls, fetchImprovementNotice } from '../lib/api'
+import { fetchEvidenceUrls, fetchImprovementNotice } from '../lib/api'
 import { VerdictBanner, ExtractedFields, ViolationList, EvidencePhotos } from '../components/ScanResult'
 import { Banner, EmptyState, Spinner } from '../components/ui'
 import { ChevronLeft, InboxIcon, DownloadIcon } from '../components/Icons'
-import { evidencePaths, formatDateTime, scanTitle, violationCount } from '../lib/format'
+import { formatDateTime, scanTitle, violationCount } from '../lib/format'
 
 /**
- * Evidence photos for a record. The bucket is private, so each view mints
- * short-lived signed URLs rather than linking to a public object.
+ * Evidence photos for a record. The bucket is private, so the backend mints
+ * short-lived signed URLs after checking that this user owns the scan (or is
+ * an admin) — the same rule that guards the notice.
  */
-function EvidenceSection({ scan }: { scan: ScanRecord }) {
+function EvidenceSection({ scanId }: { scanId: string | number }) {
   const [urls, setUrls] = useState<{ front: string | null; back: string | null }>({
     front: null,
     back: null,
   })
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
-    const paths = evidencePaths(scan)
-    void evidenceSignedUrls(paths.front, paths.back).then((signed) => {
-      if (active) setUrls(signed)
-    })
+    setError(null)
+    fetchEvidenceUrls(scanId)
+      .then((signed) => {
+        if (active) setUrls(signed)
+      })
+      .catch((e: unknown) => {
+        if (active) setError(e instanceof Error ? e.message : 'Could not load evidence photos.')
+      })
     return () => {
       active = false
     }
-  }, [scan])
+  }, [scanId])
 
   return (
     <div>
       <div className="section-label">Evidence photos</div>
+      {error && <Banner kind="error">{error}</Banner>}
       <EvidencePhotos front={urls.front} back={urls.back} />
     </div>
   )
@@ -125,7 +131,7 @@ export default function ScanDetail() {
 
             <VerdictBanner status={scan.status} violationCount={violationCount(scan)} />
 
-            <EvidenceSection scan={scan} />
+            <EvidenceSection scanId={scan.id} />
 
             <div>
               <div className="section-label">Violations</div>

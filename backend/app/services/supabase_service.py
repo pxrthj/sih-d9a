@@ -44,6 +44,28 @@ class SupabaseService:
             logger.error(f"Error downloading '{storage_path}' from bucket '{self.bucket_name}': {exc}")
             raise
 
+    def create_signed_url(self, storage_path: Optional[str], expires_in: int = 3600) -> Optional[str]:
+        """
+        Mint a short-lived signed URL for an object in the evidence bucket.
+
+        Uses the service-role key, so it does not depend on any storage RLS
+        policy or on the object's `owner` column being populated. Callers must
+        authorise the request themselves (owner-or-admin) before handing the
+        URL out. Returns None if the path is empty or signing fails.
+        """
+        clean = (storage_path or "").strip()
+        if not clean:
+            return None
+        try:
+            result = self.client.storage.from_(self.bucket_name).create_signed_url(clean, expires_in)
+        except Exception as exc:
+            logger.warning(f"Could not sign '{clean}' in bucket '{self.bucket_name}': {exc}")
+            return None
+        if isinstance(result, dict):
+            # supabase-py has used both spellings across versions.
+            return result.get("signedURL") or result.get("signedUrl") or result.get("signed_url")
+        return getattr(result, "signed_url", None)
+
     def get_mime_type(self, storage_path: str) -> str:
         """Guesses MIME type from file extension, default to image/jpeg."""
         mime_type, _ = mimetypes.guess_type(storage_path)

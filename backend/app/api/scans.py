@@ -63,6 +63,9 @@ _SCAN_CALLS: Dict[str, List[float]] = defaultdict(list)
 _RATE_LIMIT_MAX = 20        # scans
 _RATE_LIMIT_WINDOW = 60.0   # per this many seconds, per user
 
+# How long an evidence-photo signed URL stays valid (seconds).
+_EVIDENCE_URL_TTL = 3600
+
 
 def _enforce_scan_rate_limit(user_id: str) -> None:
     now = time.time()
@@ -213,6 +216,62 @@ def _split_storage_path(scan: dict) -> tuple[str | None, str | None]:
     return front, back
 
 
+def _authorise_scan_access(
+    scan_id: str,
+    current_user: Dict[str, Optional[str]],
+    supabase_service: SupabaseService,
+) -> dict:
+    """Load a scan and confirm the caller may see it (owner, or any admin).
+
+    Mirrors the RLS scoping on the `scans` table, which the service-role
+    backend bypasses. Raises the appropriate HTTPException otherwise.
+    """
+    try:
+        scan = supabase_service.fetch_scan(scan_id)
+    except Exception as exc:
+        logger.error(f"Failed to fetch scan '{scan_id}': {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to fetch the scan record.",
+        )
+
+    if not scan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Scan not found.",
+        )
+
+    if scan.get("user_id") != current_user["id"] and current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorised to access this record.",
+        )
+    return scan
+
+
+@router.get(
+    "/{scan_id}/evidence",
+    summary="Short-lived signed URLs for a scan's evidence photos",
+    description=(
+        "Returns time-limited signed URLs for the FRONT and BACK evidence photos of an "
+        "existing scan. The bucket is private and the URLs are minted server-side with the "
+        "service-role key, so this works without any storage read policy; access is "
+        "authorised the same way as the notice (owner, or an admin). Read-only."
+    ),
+)
+def get_scan_evidence(
+    scan_id: str,
+    current_user: Dict[str, Optional[str]] = Depends(get_current_user),
+    supabase_service: SupabaseService = Depends(get_supabase_service),
+) -> Dict[str, Optional[str]]:
+    scan = _authorise_scan_access(scan_id, current_user, supabase_service)
+    front_name, back_name = _split_storage_path(scan)
+    return {
+        "front": supabase_service.create_signed_url(front_name, _EVIDENCE_URL_TTL),
+        "back": supabase_service.create_signed_url(back_name, _EVIDENCE_URL_TTL),
+    }
+
+
 @router.get(
     "/{scan_id}/notice",
     summary="Download a Legal Metrology Improvement Notice PDF for a scan",
@@ -226,29 +285,9 @@ def download_improvement_notice(
     current_user: Dict[str, Optional[str]] = Depends(get_current_user),
     supabase_service: SupabaseService = Depends(get_supabase_service),
 ) -> Response:
-    # 1. Fetch the immutable scan record (read-only)
-    try:
-        scan = supabase_service.fetch_scan(scan_id)
-    except Exception as exc:
-        logger.error(f"Failed to fetch scan '{scan_id}' for notice: {exc}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to fetch the scan record.",
-        )
-
-    if not scan:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Scan not found.",
-        )
-
-    # 1b. Authorisation: only the scan's owner or an admin may download it
-    #     (mirrors the RLS scoping, which the service-role backend bypasses).
-    if scan.get("user_id") != current_user["id"] and current_user.get("role") != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not authorised to access this record.",
-        )
+    # 1. Fetch the immutable scan record (read-only) and authorise the caller:
+    #    only the scan's owner or an admin may download it.
+    scan = _authorise_scan_access(scan_id, current_user, supabase_service)
 
     # 2. Officer attribution (name/email) from the profiles table
     profile = None

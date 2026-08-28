@@ -18,6 +18,14 @@
 alter table public.scans
   add column if not exists user_id uuid references auth.users (id);
 
+-- Dedicated evidence path columns. The backend prefers these and falls back to
+-- the combined "front.jpg | back.jpg" storage_path when they are absent, so
+-- this is optional — but with them the insert succeeds on the first attempt
+-- instead of erroring and retrying on every scan.
+alter table public.scans
+  add column if not exists front_path text,
+  add column if not exists back_path  text;
+
 -- ---------------------------------------------------------------------------
 -- 2. profiles table
 -- ---------------------------------------------------------------------------
@@ -141,17 +149,10 @@ create policy evidence_upload_authenticated on storage.objects
   for insert to authenticated
   with check (bucket_id = 'evidence-photos');
 
--- Officers may read back the photos they uploaded; admins may read all of them.
--- This is what lets the app mint short-lived SIGNED urls for the scan detail
--- view. The bucket itself stays private: there is no public object url, and an
--- officer cannot read another officer's evidence (mirroring the scans policy).
--- The backend still reads the bytes with the service-role key, which bypasses
--- these policies entirely.
+-- No client SELECT policy is needed on the evidence bucket. The app never reads
+-- these objects directly: the backend mints short-lived SIGNED urls with the
+-- service-role key (GET /api/scans/{id}/evidence) after checking that the caller
+-- owns the scan or is an admin, and reads the bytes itself when building the
+-- notice. The bucket therefore stays private with upload as its only client
+-- permission.
 drop policy if exists evidence_read_own_or_admin on storage.objects;
-
-create policy evidence_read_own_or_admin on storage.objects
-  for select to authenticated
-  using (
-    bucket_id = 'evidence-photos'
-    and (owner = auth.uid() or public.is_admin())
-  );
