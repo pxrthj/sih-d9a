@@ -17,6 +17,9 @@ dist/
 .ruff_cache/
 *.egg-info/
 
+# Editor / tooling config
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
