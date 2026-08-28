@@ -97,7 +97,7 @@ frontend/src/
   components/     shared UI
   hooks/ lib/     data access and formatting
 supabase/schema.sql   tables, trigger, and every RLS policy — idempotent, run it once
-docs/                 setup, deployment, and the long-form guides
+docs/                 setup, deployment, design, and the team briefing book
 ```
 
 ## Running it
@@ -128,9 +128,8 @@ cd backend && venv/Scripts/pip install -r requirements-dev.txt && venv/Scripts/p
 | [docs/SETUP.md](docs/SETUP.md) | One-time setup: database, OAuth, environment variables |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | Deploying to Vercel + Render, and wiring CORS/OAuth |
 | [docs/BRIEFING-BOOK.docx](docs/BRIEFING-BOOK.docx) | Team briefing: architecture, rules, security, Q&A bank |
-| [docs/CODEBOOK.md](docs/CODEBOOK.md) | Phase-by-phase walkthrough of the whole codebase |
-| [docs/BUILD-JOURNEY.md](docs/BUILD-JOURNEY.md) | How it was built, in order, including what went wrong |
 | [docs/DESIGN.md](docs/DESIGN.md) | Design tokens and component conventions |
+| [CLAUDE.md](CLAUDE.md) | Working context: invariants, gotchas, and conventions to preserve |
 
 ## Scope and limitations
 
