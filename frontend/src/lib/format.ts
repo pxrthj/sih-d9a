@@ -23,6 +23,10 @@ export function formatDateShort(iso?: string | null): string {
 /** A human title for a scan derived only from its real extracted data. */
 export function scanTitle(extracted?: ExtractedData | null): string {
   if (!extracted) return 'Package scan'
+  // The generic commodity name (Rule 6(1)(b)) is the most recognisable title;
+  // fall back to the packer, then the net quantity.
+  const name = extracted.product_name
+  if (name && name.trim()) return name.trim()
   const mfr = extracted.manufacturer_packer_importer
   if (mfr && mfr.trim()) {
     // First line / first ~40 chars of the manufacturer string.
@@ -49,15 +53,6 @@ export function mrpText(extracted?: ExtractedData | null): string | null {
 
 export function violationCount(scan: ScanRecord): number {
   return Array.isArray(scan.violations) ? scan.violations.length : 0
-}
-
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.replace(/\/$/, '') || ''
-
-/** Public URL for an evidence photo stored in the (public) evidence-photos bucket. */
-export function evidenceUrl(path?: string | null): string | null {
-  const clean = path?.trim()
-  if (!clean || !SUPABASE_URL) return null
-  return `${SUPABASE_URL}/storage/v1/object/public/evidence-photos/${encodeURIComponent(clean)}`
 }
 
 /**

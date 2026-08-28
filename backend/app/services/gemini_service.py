@@ -29,7 +29,7 @@ class GeminiService:
     def __init__(self, settings: Optional[Settings] = None):
         self.settings = settings or get_settings()
         self.client = genai.Client(api_key=self.settings.GEMINI_API_KEY)
-        # Model string is explicitly "gemini-3.5-flash"
+        # Whatever GEMINI_MODEL is set to (default: gemini-3.5-flash-lite).
         self.model_name = self.settings.GEMINI_MODEL
 
     def extract_label_data(
@@ -41,7 +41,7 @@ class GeminiService:
     ) -> ExtractedData:
         """
         Sends BOTH front and back images of the product to the Gemini API in a SINGLE call
-        using model string 'gemini-3.5-flash' in JSON mode with responseSchema.
+        using the configured model (GEMINI_MODEL) in JSON mode with responseSchema.
 
         Args:
             front_image_bytes: Binary data of the front product image.

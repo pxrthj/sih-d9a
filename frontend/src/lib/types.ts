@@ -13,6 +13,7 @@ export interface MRP {
 }
 
 export interface ExtractedData {
+  product_name: string | null
   manufacturer_packer_importer: string | null
   net_quantity: NetQuantity | null
   mrp: MRP | null

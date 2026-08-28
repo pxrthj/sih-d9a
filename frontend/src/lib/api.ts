@@ -12,22 +12,68 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+/** File extension for the image types a phone camera can hand us. */
+const EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+}
+
 /**
  * Uploads a single image to the Supabase Storage "evidence-photos" bucket
- * under a random `${uuid}.jpg` key and returns the stored object path.
+ * under a random `${uuid}.${ext}` key and returns the stored object path.
+ *
+ * The extension and content type follow the real file: the backend guesses the
+ * MIME type from the stored filename before handing the bytes to Gemini, so
+ * naming a PNG ".jpg" would send it up mislabelled.
  */
 export async function uploadEvidencePhoto(file: File): Promise<string> {
-  const path = `${crypto.randomUUID()}.jpg`
+  const mime = (file.type || '').toLowerCase()
+  const ext = EXT_BY_MIME[mime] ?? 'jpg'
+  const contentType = EXT_BY_MIME[mime] ? mime : 'image/jpeg'
+  const path = `${crypto.randomUUID()}.${ext}`
   const { error } = await supabase.storage
     .from(EVIDENCE_BUCKET)
     .upload(path, file, {
-      contentType: 'image/jpeg',
+      contentType,
       upsert: false,
     })
   if (error) {
     throw new Error(`Image upload failed: ${error.message}`)
   }
   return path
+}
+
+/**
+ * Short-lived signed URLs for a scan's two evidence photos.
+ *
+ * The bucket is private, so there is no public URL to link to — a signed URL is
+ * minted per view and expires. Returns null for a path that is missing or that
+ * the signed-in user is not allowed to read.
+ */
+export async function evidenceSignedUrls(
+  front: string | null,
+  back: string | null,
+  expiresInSeconds = 3600,
+): Promise<{ front: string | null; back: string | null }> {
+  const sign = async (path: string | null): Promise<string | null> => {
+    const clean = path?.trim()
+    if (!clean) return null
+    const { data, error } = await supabase.storage
+      .from(EVIDENCE_BUCKET)
+      .createSignedUrl(clean, expiresInSeconds)
+    if (error) {
+      console.warn(`Could not sign evidence photo "${clean}": ${error.message}`)
+      return null
+    }
+    return data?.signedUrl ?? null
+  }
+
+  const [frontUrl, backUrl] = await Promise.all([sign(front), sign(back)])
+  return { front: frontUrl, back: backUrl }
 }
 
 /**

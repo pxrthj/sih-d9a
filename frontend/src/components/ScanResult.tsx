@@ -88,6 +88,7 @@ export function ExtractedFields({ extracted }: { extracted: ExtractedData | null
 
   return (
     <div className="card">
+      <Field label="Product Name" value={extracted.product_name} />
       <Field label="Manufacturer / Packer / Importer" value={extracted.manufacturer_packer_importer} />
       <Field label="Net Quantity" value={nq} />
       <div className="field">

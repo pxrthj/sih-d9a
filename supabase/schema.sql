@@ -134,10 +134,24 @@ insert into storage.buckets (id, name, public)
 values ('evidence-photos', 'evidence-photos', false)
 on conflict (id) do nothing;
 
--- Authenticated officers may upload evidence photos. The backend reads them
--- with the service-role key, so no client SELECT policy is required.
+-- Authenticated officers may upload evidence photos.
 drop policy if exists evidence_upload_authenticated on storage.objects;
 
 create policy evidence_upload_authenticated on storage.objects
   for insert to authenticated
   with check (bucket_id = 'evidence-photos');
+
+-- Officers may read back the photos they uploaded; admins may read all of them.
+-- This is what lets the app mint short-lived SIGNED urls for the scan detail
+-- view. The bucket itself stays private: there is no public object url, and an
+-- officer cannot read another officer's evidence (mirroring the scans policy).
+-- The backend still reads the bytes with the service-role key, which bypasses
+-- these policies entirely.
+drop policy if exists evidence_read_own_or_admin on storage.objects;
+
+create policy evidence_read_own_or_admin on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'evidence-photos'
+    and (owner = auth.uid() or public.is_admin())
+  );

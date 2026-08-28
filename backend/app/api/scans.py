@@ -84,7 +84,7 @@ def _enforce_scan_rate_limit(user_id: str) -> None:
     summary="Process dual-sided product label scan",
     description=(
         "Fetches FRONT and BACK label photos from Supabase Storage 'evidence-photos', extracts Legal Metrology "
-        "declarations in a single call using Gemini 3.5 Flash with structured output, applies compliance rules, "
+        "declarations in a single call to the configured Gemini model with structured output, applies compliance rules, "
         "persists results into Supabase 'scans' table, and returns extracted data and violations."
     ),
 )
@@ -143,7 +143,7 @@ def create_scan(
             detail="Failed to retrieve the back image from storage.",
         )
 
-    # 2. Detect mime types and extract declarations via Gemini API (gemini-3.5-flash) in a SINGLE call
+    # 2. Detect mime types and extract declarations via the Gemini API in a SINGLE call
     front_mime = supabase_service.get_mime_type(front_path)
     back_mime = supabase_service.get_mime_type(back_path)
 

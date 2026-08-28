@@ -1,11 +1,41 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useScan } from '../hooks/useScans'
-import { fetchImprovementNotice } from '../lib/api'
+import type { ScanRecord } from '../lib/types'
+import { evidenceSignedUrls, fetchImprovementNotice } from '../lib/api'
 import { VerdictBanner, ExtractedFields, ViolationList, EvidencePhotos } from '../components/ScanResult'
 import { Banner, EmptyState, Spinner } from '../components/ui'
 import { ChevronLeft, InboxIcon, DownloadIcon } from '../components/Icons'
-import { evidencePaths, evidenceUrl, formatDateTime, scanTitle, violationCount } from '../lib/format'
+import { evidencePaths, formatDateTime, scanTitle, violationCount } from '../lib/format'
+
+/**
+ * Evidence photos for a record. The bucket is private, so each view mints
+ * short-lived signed URLs rather than linking to a public object.
+ */
+function EvidenceSection({ scan }: { scan: ScanRecord }) {
+  const [urls, setUrls] = useState<{ front: string | null; back: string | null }>({
+    front: null,
+    back: null,
+  })
+
+  useEffect(() => {
+    let active = true
+    const paths = evidencePaths(scan)
+    void evidenceSignedUrls(paths.front, paths.back).then((signed) => {
+      if (active) setUrls(signed)
+    })
+    return () => {
+      active = false
+    }
+  }, [scan])
+
+  return (
+    <div>
+      <div className="section-label">Evidence photos</div>
+      <EvidencePhotos front={urls.front} back={urls.back} />
+    </div>
+  )
+}
 
 /** Read-only action: downloads the generated Improvement Notice PDF. */
 function DownloadNoticeButton({ scanId }: { scanId: string | number }) {
@@ -95,15 +125,7 @@ export default function ScanDetail() {
 
             <VerdictBanner status={scan.status} violationCount={violationCount(scan)} />
 
-            {(() => {
-              const paths = evidencePaths(scan)
-              return (
-                <div>
-                  <div className="section-label">Evidence photos</div>
-                  <EvidencePhotos front={evidenceUrl(paths.front)} back={evidenceUrl(paths.back)} />
-                </div>
-              )
-            })()}
+            <EvidenceSection scan={scan} />
 
             <div>
               <div className="section-label">Violations</div>
