@@ -21,6 +21,8 @@ already configured (see [SETUP.md](SETUP.md)).
    - `GEMINI_API_KEY` — your Gemini key
    - `CORS_ORIGINS` — leave as a placeholder for now (e.g. `http://localhost:5173`); you'll set
      it to the Vercel URL in step 3.
+   - `APP_BASE_URL` — the public frontend origin, used for the verification link and QR printed
+     on each notice. Same placeholder for now; set it to the Vercel URL in step 3 too.
    - `GEMINI_MODEL` and `PYTHON_VERSION` are pre-filled by the blueprint.
 3. **Apply / Create** → wait for the build (installs `requirements.txt`; all pure-Python, no
    system libraries needed). When live, note the URL, e.g.:
@@ -57,6 +59,7 @@ already configured (see [SETUP.md](SETUP.md)).
 Now that you have the Vercel URL:
 
 1. **Render → parakhmitra-backend → Environment** → set
+   `APP_BASE_URL = https://parakhmitra.vercel.app` and
    `CORS_ORIGINS = https://parakhmitra.vercel.app` (your actual Vercel domain; comma-separate
    multiple). Save → Render redeploys.
 2. **Supabase → Authentication → URL Configuration:**

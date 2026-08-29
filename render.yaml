@@ -24,3 +24,6 @@ services:
       # Comma-separated allowed frontend origins, e.g. https://parakhmitra.vercel.app
       - key: CORS_ORIGINS
         sync: false
+      # Public frontend origin, used for the verification link printed on notices
+      - key: APP_BASE_URL
+        sync: false

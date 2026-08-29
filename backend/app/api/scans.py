@@ -2,11 +2,11 @@ import logging
 import time
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from app.schemas.scan import MAX_LABEL_IMAGES, ScanRequest, ScanResponse
 from app.services.supabase_service import SupabaseService
 from app.services.gemini_service import GeminiService
-from app.services.report_service import generate_notice_pdf
+from app.services.report_service import _fmt_dt, _notice_ref, generate_notice_pdf, notice_filename
 from app.rules.engine import build_advisories, check_compliance_rules
 from app.config import Settings, get_settings
 
@@ -65,6 +65,25 @@ _RATE_LIMIT_WINDOW = 60.0   # per this many seconds, per user
 
 # How long an evidence-photo signed URL stays valid (seconds).
 _EVIDENCE_URL_TTL = 3600
+
+# The verification route is public, so it is limited per client address rather
+# than per user. Generous, because a single notice may be checked by several
+# people, but enough to stop anyone enumerating.
+_VERIFY_CALLS: Dict[str, List[float]] = defaultdict(list)
+_VERIFY_LIMIT_MAX = 60
+_VERIFY_LIMIT_WINDOW = 60.0
+
+
+def _enforce_verify_rate_limit(client_ip: str) -> None:
+    now = time.time()
+    calls = _VERIFY_CALLS[client_ip]
+    calls[:] = [t for t in calls if t > now - _VERIFY_LIMIT_WINDOW]
+    if len(calls) >= _VERIFY_LIMIT_MAX:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many verification requests. Please wait a moment.",
+        )
+    calls.append(now)
 
 
 def _enforce_scan_rate_limit(user_id: str) -> None:
@@ -255,6 +274,65 @@ def get_scan_evidence(
 
 
 @router.get(
+    "/{scan_id}/verify",
+    summary="Public verification of an issued Improvement Notice",
+    description=(
+        "Returns the authoritative verdict for a scan so that anyone holding a printed "
+        "notice can check it against the record. Deliberately PUBLIC and deliberately "
+        "minimal: the scan id printed on the notice is the credential, and only what is "
+        "already printed on that notice is returned — never the evidence photographs, "
+        "the officer's email, or any other record."
+    ),
+)
+def verify_scan(
+    scan_id: str,
+    request: Request,
+    supabase_service: SupabaseService = Depends(get_supabase_service),
+) -> Dict[str, object]:
+    _enforce_verify_rate_limit(request.client.host if request.client else "unknown")
+
+    try:
+        scan = supabase_service.fetch_scan(scan_id)
+    except Exception as exc:
+        logger.error(f"Verification lookup failed for '{scan_id}': {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not reach the inspection record.",
+        )
+
+    if not scan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No inspection record matches this reference.",
+        )
+
+    profile = None
+    try:
+        profile = supabase_service.fetch_profile(scan.get("user_id"))
+    except Exception as exc:
+        logger.warning(f"Officer name unavailable for verification of '{scan_id}': {exc}")
+
+    extracted = scan.get("extracted") or {}
+    return {
+        "notice_ref": _notice_ref(scan),
+        "status": scan.get("status"),
+        "inspection_date": _fmt_dt(scan.get("created_at"), with_time=True),
+        "officer_name": (profile or {}).get("full_name") or "Unknown officer",
+        "category": scan.get("category") or "General",
+        "product_name": extracted.get("product_name"),
+        "manufacturer": extracted.get("manufacturer_packer_importer"),
+        "violations": [
+            {"field": v.get("field"), "issue": v.get("issue"), "rule_ref": v.get("rule_ref")}
+            for v in (scan.get("violations") or [])
+        ],
+        "advisories": [
+            {"field": a.get("field"), "issue": a.get("issue"), "rule_ref": a.get("rule_ref")}
+            for a in (scan.get("advisories") or [])
+        ],
+    }
+
+
+@router.get(
     "/{scan_id}/notice",
     summary="Download a Legal Metrology Improvement Notice PDF for a scan",
     description=(
@@ -266,6 +344,7 @@ def download_improvement_notice(
     scan_id: str,
     current_user: Dict[str, Optional[str]] = Depends(get_current_user),
     supabase_service: SupabaseService = Depends(get_supabase_service),
+    settings: Settings = Depends(get_settings),
 ) -> Response:
     # 1. Fetch the immutable scan record (read-only) and authorise the caller:
     #    only the scan's owner or an admin may download it.
@@ -298,6 +377,7 @@ def download_improvement_notice(
             officer_name=officer_name,
             officer_email=officer_email,
             evidence=evidence,
+            verify_url=f"{settings.APP_BASE_URL}/verify/{scan_id}",
         )
     except Exception as exc:
         logger.error(f"Failed to generate notice PDF for scan '{scan_id}': {exc}")
@@ -306,7 +386,7 @@ def download_improvement_notice(
             detail="Failed to generate the improvement notice.",
         )
 
-    filename = f"improvement-notice-{str(scan_id)[:8]}.pdf"
+    filename = notice_filename(scan)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

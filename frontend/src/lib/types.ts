@@ -60,6 +60,22 @@ export interface ScanResponse {
 /** Maximum label photos per scan; the backend enforces the same limit. */
 export const MAX_LABEL_IMAGES = 4
 
+/**
+ * The public view of an inspection, returned to anyone holding the notice.
+ * Deliberately narrower than a ScanRecord — no photos, no officer email.
+ */
+export interface Verification {
+  notice_ref: string
+  status: string | null
+  inspection_date: string
+  officer_name: string
+  category: string
+  product_name: string | null
+  manufacturer: string | null
+  violations: Violation[]
+  advisories: Advisory[]
+}
+
 // A row from the Supabase "scans" table.
 export interface ScanRecord {
   id: string | number

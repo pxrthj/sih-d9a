@@ -14,13 +14,21 @@ import io
 import logging
 from pathlib import Path
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional, Tuple
 
+import qrcode
 from jinja2 import Environment, BaseLoader, select_autoescape
 from PIL import Image
 from xhtml2pdf import pisa
 
 logger = logging.getLogger(__name__)
+
+# Every date on this notice is Indian Standard Time. It is an Indian legal
+# document, and the 30-day compliance period is counted from the date printed
+# on it — so a UTC timestamp would show the wrong day for anything issued
+# before 05:30 IST.
+IST = ZoneInfo("Asia/Kolkata")
 
 
 # ---------------------------------------------------------------------------
@@ -174,13 +182,28 @@ NOTICE_HTML = """
   {% endif %}
   </div>
 
+  {% if qr_uri %}
+  <table style="margin-top:14pt;"><tr>
+    <td style="width:2.6cm; vertical-align:top;"><img src="{{ qr_uri }}" style="width:2.3cm; height:2.3cm;" /></td>
+    <td style="vertical-align:top; padding-left:8pt;">
+      <div style="font-size:9pt; font-weight:bold; color:#002045;">VERIFY THIS NOTICE</div>
+      <div style="font-size:8.5pt; color:#43474e; padding-top:3pt;">
+        Scan the code, or visit the address below, to check this notice against the
+        original inspection record. The record cannot be altered after it is created,
+        so any discrepancy means this document has been modified.
+      </div>
+      <div style="font-size:8pt; color:#1960a3; padding-top:4pt;">{{ verify_url }}</div>
+    </td>
+  </tr></table>
+  {% endif %}
+
   <table class="sign"><tr>
     <td><div class="line">Signature of Inspecting Officer</div></td>
     <td><div class="line">Office Seal</div></td>
   </tr></table>
 
   <div class="footer">
-    ParakhMitra | Legal Metrology Compliance - computer-generated improvement notice | Ref {{ notice_ref }} | generated {{ generated_at }}
+    ParakhMitra | Legal Metrology Compliance - computer-generated improvement notice | Ref {{ notice_ref }} | record {{ record_id }} | generated {{ generated_at }}
   </div>
 
 </body>
@@ -247,13 +270,65 @@ def _field_label(key: str) -> str:
 
 
 def _fmt_dt(iso: Optional[str], with_time: bool = False) -> str:
+    """Format a stored timestamp in IST.
+
+    Timestamps arrive from Postgres in UTC. Converting — rather than merely
+    formatting — is what stops the notice showing a time 5.5 hours behind the
+    one the officer saw on screen.
+    """
     if not iso:
         return "-"
     try:
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
-        return dt.strftime("%d %b %Y, %H:%M") if with_time else dt.strftime("%d %b %Y")
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.astimezone(IST)
+        return dt.strftime("%d %b %Y, %H:%M IST") if with_time else dt.strftime("%d %b %Y")
     except Exception:
         return iso
+
+
+def _notice_ref(scan: Dict[str, Any]) -> str:
+    """A quotable reference for the notice, derived from the record.
+
+    A raw UUID is unique but unusable — nobody reads one aloud or files under
+    it. This yields e.g. 'PM/2026/AF63AA2A3F1E': structured like a real notice
+    reference, still unique in practice, and stable because it is derived from
+    the immutable record rather than generated at render time.
+    """
+    created = scan.get("created_at")
+    year = None
+    if created:
+        try:
+            year = datetime.fromisoformat(str(created).replace("Z", "+00:00")).astimezone(IST).year
+        except Exception:
+            year = None
+    year = year or datetime.now(IST).year
+    token = str(scan.get("id", "")).replace("-", "").upper()[:12] or "UNKNOWN"
+    return f"PM/{year}/{token}"
+
+
+def notice_filename(scan: Dict[str, Any]) -> str:
+    """Download filename matching the printed reference.
+
+    The old form truncated the id to 8 hex characters, which collides often
+    enough to silently overwrite one notice with another in a downloads folder.
+    """
+    return "improvement-notice-" + _notice_ref(scan).replace("/", "-") + ".pdf"
+
+
+def _qr_data_uri(url: str) -> Optional[str]:
+    """QR pointing at the public verification page, as an embedded PNG."""
+    if not url:
+        return None
+    try:
+        img = qrcode.make(url).convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception as exc:
+        logger.warning("Could not render the verification QR (%s).", exc)
+        return None
 
 
 def generate_notice_pdf(
@@ -262,6 +337,7 @@ def generate_notice_pdf(
     officer_name: str,
     officer_email: Optional[str],
     evidence: Optional[List[Tuple[bytes, str]]] = None,
+    verify_url: Optional[str] = None,
     compliance_period: str = "30 days",
 ) -> bytes:
     """Render the Improvement Notice HTML and convert it to PDF bytes."""
@@ -307,13 +383,16 @@ def generate_notice_pdf(
             photos.append({"uri": uri, "w": width, "h": height, "caption": f"Photo {index}"})
     photo_rows = [photos[i:i + 2] for i in range(0, len(photos), 2)]
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(IST)
     context = {
         "logo_uri": LOGO_URI,
-        "notice_ref": str(scan.get("id", "-")),
+        "notice_ref": _notice_ref(scan),
+        "record_id": str(scan.get("id", "-")),
+        "verify_url": verify_url,
+        "qr_uri": _qr_data_uri(verify_url) if verify_url else None,
         "notice_date": now.strftime("%d %b %Y"),
         "inspection_date": _fmt_dt(scan.get("created_at"), with_time=True),
-        "generated_at": now.strftime("%d %b %Y %H:%M UTC"),
+        "generated_at": now.strftime("%d %b %Y %H:%M IST"),
         "officer_name": officer_name or "Unknown officer",
         "officer_email": officer_email or "",
         "category": scan.get("category") or "General",

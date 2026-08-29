@@ -1,5 +1,5 @@
 import { supabase, EVIDENCE_BUCKET } from './supabase'
-import type { ScanResponse } from './types'
+import type { ScanResponse, Verification } from './types'
 
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
@@ -115,10 +115,15 @@ export async function createScan(params: {
 }
 
 /**
- * Fetches the generated Improvement Notice PDF for a scan as a Blob.
+ * Fetches the generated Improvement Notice PDF for a scan.
  * Read-only — the backend generates the document from the immutable record.
+ *
+ * The filename comes from the server so the downloaded file matches the
+ * reference printed on the notice itself.
  */
-export async function fetchImprovementNotice(scanId: string | number): Promise<Blob> {
+export async function fetchImprovementNotice(
+  scanId: string | number,
+): Promise<{ blob: Blob; filename: string }> {
   const res = await fetch(`${API_BASE_URL}/api/scans/${scanId}/notice`, {
     headers: await authHeaders(),
   })
@@ -132,5 +137,33 @@ export async function fetchImprovementNotice(scanId: string | number): Promise<B
     }
     throw new Error(detail)
   }
-  return res.blob()
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const match = /filename="?([^";]+)"?/.exec(disposition)
+  return {
+    blob: await res.blob(),
+    filename: match?.[1] ?? `improvement-notice-${String(scanId).slice(0, 8)}.pdf`,
+  }
+}
+
+/**
+ * Public verification of a notice — no sign-in, because whoever holds the
+ * printed document needs to be able to check it. The backend returns only what
+ * is already printed there.
+ */
+export async function fetchVerification(scanId: string): Promise<Verification> {
+  const res = await fetch(`${API_BASE_URL}/api/scans/${scanId}/verify`)
+  if (!res.ok) {
+    let detail =
+      res.status === 404
+        ? 'No inspection record matches this reference.'
+        : `Verification is unavailable right now (HTTP ${res.status}).`
+    try {
+      const body = await res.json()
+      if (body?.detail && typeof body.detail === 'string') detail = body.detail
+    } catch {
+      // not JSON; keep the message above
+    }
+    throw new Error(detail)
+  }
+  return (await res.json()) as Verification
 }

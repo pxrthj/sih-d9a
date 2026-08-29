@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
 import { FullScreenLoader } from './components/ui'
 import Layout from './components/Layout'
@@ -11,9 +11,21 @@ import History from './screens/History'
 import ScanDetail from './screens/ScanDetail'
 import Profile from './screens/Profile'
 import Users from './screens/Users'
+import Verify from './screens/Verify'
 
 export default function App() {
   const { session, loading, accessDenied, isAdmin } = useAuth()
+  const location = useLocation()
+
+  // Public, and checked before anything else: the QR on a printed notice has to
+  // work for whoever is holding the paper, signed in or not.
+  if (location.pathname.startsWith('/verify/')) {
+    return (
+      <Routes>
+        <Route path="/verify/:id" element={<Verify />} />
+      </Routes>
+    )
+  }
 
   if (loading) {
     return <FullScreenLoader label="Loading ParakhMitra…" />

@@ -55,11 +55,11 @@ function DownloadNoticeButton({ scanId }: { scanId: string | number }) {
     setDownloading(true)
     setError(null)
     try {
-      const blob = await fetchImprovementNotice(scanId)
+      const { blob, filename } = await fetchImprovementNotice(scanId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `improvement-notice-${String(scanId).slice(0, 8)}.pdf`
+      a.download = filename
       document.body.appendChild(a)
       a.click()
       a.remove()

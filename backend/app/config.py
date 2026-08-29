@@ -37,6 +37,11 @@ class Settings(BaseModel):
     GEMINI_MODEL: str = Field(
         default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
     )
+    # Public base URL of the frontend, used to build the verification link
+    # printed on each notice. Set to the deployed origin in production.
+    APP_BASE_URL: str = Field(
+        default_factory=lambda: os.getenv("APP_BASE_URL", "http://localhost:5173").rstrip("/")
+    )
     STORAGE_BUCKET: str = Field(default="evidence-photos")
     CORS_ORIGINS: List[str] = Field(default_factory=_parse_cors_origins)
 

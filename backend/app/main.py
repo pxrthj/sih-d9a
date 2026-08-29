@@ -26,6 +26,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # So the frontend can use the filename the server chose for the notice
+    # instead of inventing its own.
+    expose_headers=["Content-Disposition"],
 )
 
 # Register API routers

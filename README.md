@@ -55,13 +55,14 @@ application code, decides what comes back.
 | Data | Supabase (Postgres, Auth, Storage) | Records, Google sign-in, private evidence bucket, RLS |
 | Extraction | Gemini 3.5 Flash | Photographs → one schema-validated JSON object |
 
-The API is deliberately four endpoints wide, and only one of them writes:
+The API is deliberately five endpoints wide, and only one of them writes:
 
 | Endpoint | Purpose |
 | --- | --- |
 | `POST /api/scans` | Run the pipeline; returns extraction, violations, advisories, status |
 | `GET /api/scans/{id}/evidence` | Short-lived signed URLs for the evidence photos |
 | `GET /api/scans/{id}/notice` | Render the Improvement Notice PDF |
+| `GET /api/scans/{id}/verify` | **Public.** Verdict for a printed notice, so it can be checked against the record |
 | `GET /health` | Liveness probe |
 
 ---
@@ -80,6 +81,9 @@ interface:
 - **Two roles, enforced twice.** Officers scan and see their own work; admins oversee everything
   and manage users but cannot scan, so the audit trail never contains an inspection filed by the
   person supervising the inspectors. Both boundaries exist in the router *and* in RLS.
+- **Notices are tamper-evident.** The PDF is a rendering, not the record. Each one carries a QR
+  linking to a public verification page that reads the verdict straight from the database, so an
+  altered document can be caught by anyone holding it.
 - **Evidence stays private.** The bucket has no client read policy; the backend mints expiring
   signed URLs after checking the same owner-or-admin rule as the notice.
 
