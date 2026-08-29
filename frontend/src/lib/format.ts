@@ -55,6 +55,57 @@ export function violationCount(scan: ScanRecord): number {
   return Array.isArray(scan.violations) ? scan.violations.length : 0
 }
 
+/** The rule breached most often across a set of scans. */
+export interface TopBreach {
+  ruleRef: string
+  field: string
+  /** How many scans breached it. */
+  count: number
+  /** That count as a percentage of the scans carrying any violation. */
+  share: number
+}
+
+/**
+ * Finds the single most-breached rule across the given scans.
+ *
+ * Each of the eight rules can fire at most once per scan, so a rule's count is
+ * also the number of packages that breached it. The share is measured against
+ * scans that had any violation at all — compliant packages would only dilute it.
+ *
+ * Returns null when there is nothing to report, so the caller can hide the tile
+ * rather than render an empty one.
+ */
+export function topBreach(scans: ScanRecord[]): TopBreach | null {
+  const counts = new Map<string, { field: string; count: number }>()
+  let flagged = 0
+
+  for (const scan of scans) {
+    const violations = Array.isArray(scan.violations) ? scan.violations : []
+    if (violations.length === 0) continue
+    flagged++
+    for (const v of violations) {
+      const entry = counts.get(v.rule_ref) ?? { field: v.field, count: 0 }
+      entry.count++
+      counts.set(v.rule_ref, entry)
+    }
+  }
+
+  if (flagged === 0) return null
+
+  // Highest count wins; ties break on the rule reference so the tile doesn't
+  // flicker between equals as new scans arrive.
+  const [ruleRef, top] = [...counts.entries()].sort(
+    (a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]),
+  )[0]
+
+  return {
+    ruleRef,
+    field: top.field,
+    count: top.count,
+    share: Math.round((top.count / flagged) * 100),
+  }
+}
+
 /** Nicely spaced label for an extracted/violation field key. */
 export function fieldLabel(key: string): string {
   return key

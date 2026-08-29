@@ -1,9 +1,10 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useScans } from '../hooks/useScans'
 import { Avatar, Banner, EmptyState, Spinner, StatusPill } from '../components/ui'
 import { ChevronRight, InboxIcon, ScanIcon } from '../components/Icons'
-import { formatDateShort, scanTitle, violationCount } from '../lib/format'
+import { fieldLabel, formatDateShort, scanTitle, topBreach, violationCount } from '../lib/format'
 
 export default function Dashboard() {
   const { googleName, avatarUrl, isAdmin } = useAuth()
@@ -15,6 +16,10 @@ export default function Dashboard() {
   const compliant = scans.filter((s) => (s.status || '').toLowerCase() === 'compliant').length
   const flagged = total - compliant
   const recent = scans.slice(0, 5)
+
+  // Which rule the market breaches most. Admin-only: across one officer's own
+  // handful of scans it is noise rather than a finding.
+  const breach = useMemo(() => (isAdmin ? topBreach(scans) : null), [isAdmin, scans])
 
   return (
     <div className="stack">
@@ -59,6 +64,14 @@ export default function Dashboard() {
           <div className="stat__value">{loading ? '—' : flagged}</div>
           <div className="stat__label">Flagged for violations</div>
         </div>
+        {!loading && breach && (
+          <div className="stat stat--accent" style={{ gridColumn: '1 / -1' }}>
+            <div className="stat__value">{breach.ruleRef}</div>
+            <div className="stat__label">
+              Most-breached rule · {fieldLabel(breach.field)} · {breach.share}% of flagged packages
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Recent */}
