@@ -89,6 +89,18 @@ export interface ScanRecord {
   status: string | null
   user_id?: string | null
   category?: string | null
+  // Capture location where the scan was taken (decimal degrees, WGS84). Optional
+  // — absent when the officer denied location permission or the device had no fix.
+  latitude?: number | null
+  longitude?: number | null
+  location_accuracy?: number | null
+}
+
+/** A device geolocation fix captured at scan time. */
+export interface CaptureCoords {
+  latitude: number
+  longitude: number
+  accuracy: number | null
 }
 
 export type Role = 'admin' | 'officer' | 'none'

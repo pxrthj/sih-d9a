@@ -97,6 +97,7 @@ NOTICE_HTML = """
   <table class="meta">
     <tr><td class="k">Date of notice</td><td class="v">{{ notice_date }}</td></tr>
     <tr><td class="k">Inspection date</td><td class="v">{{ inspection_date }}</td></tr>
+    {% if location %}<tr><td class="k">Inspection location</td><td class="v">{{ location.coords }}<div style="font-size:8pt; color:#1960a3; font-weight:normal; padding-top:2pt;">{{ location.maps_url }}</div></td></tr>{% endif %}
     <tr><td class="k">Inspecting officer</td><td class="v">{{ officer_name }}{% if officer_email %} &lt;{{ officer_email }}&gt;{% endif %}</td></tr>
     <tr><td class="k">Product category</td><td class="v">{{ category }}</td></tr>
     <tr><td class="k">Addressed to (Mfr/Packer/Importer)</td><td class="v">{{ packer }}</td></tr>
@@ -288,6 +289,30 @@ def _fmt_dt(iso: Optional[str], with_time: bool = False) -> str:
         return iso
 
 
+def _fmt_location(scan: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """Format the capture coordinates for the notice, or None if not recorded.
+
+    Latitude/longitude are stored as decimal degrees (WGS84). A missing pair
+    means the device had no fix or location permission was denied — in which case
+    the notice omits the location line rather than printing a placeholder.
+    """
+    lat, lng = scan.get("latitude"), scan.get("longitude")
+    if lat is None or lng is None:
+        return None
+    try:
+        lat_f, lng_f = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return None
+    coords = f"{lat_f:.6f}, {lng_f:.6f}"
+    accuracy = scan.get("location_accuracy")
+    if accuracy is not None:
+        try:
+            coords += f"  (±{round(float(accuracy))} m)"
+        except (TypeError, ValueError):
+            pass
+    return {"coords": coords, "maps_url": f"https://www.google.com/maps?q={lat_f},{lng_f}"}
+
+
 def _notice_ref(scan: Dict[str, Any]) -> str:
     """A quotable reference for the notice, derived from the record.
 
@@ -392,6 +417,7 @@ def generate_notice_pdf(
         "qr_uri": _qr_data_uri(verify_url) if verify_url else None,
         "notice_date": now.strftime("%d %b %Y"),
         "inspection_date": _fmt_dt(scan.get("created_at"), with_time=True),
+        "location": _fmt_location(scan),
         "generated_at": now.strftime("%d %b %Y %H:%M IST"),
         "officer_name": officer_name or "Unknown officer",
         "officer_email": officer_email or "",

@@ -1,5 +1,5 @@
 import { supabase, EVIDENCE_BUCKET } from './supabase'
-import type { ScanResponse, Verification } from './types'
+import type { CaptureCoords, ScanResponse, Verification } from './types'
 
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
@@ -89,6 +89,8 @@ export async function createScan(params: {
   imagePaths: string[]
   userId: string
   category: string
+  /** Capture location, when the device provided one. Omitted otherwise. */
+  coords?: CaptureCoords | null
 }): Promise<ScanResponse> {
   const res = await fetch(`${API_BASE_URL}/api/scans`, {
     method: 'POST',
@@ -97,6 +99,12 @@ export async function createScan(params: {
       image_paths: params.imagePaths,
       user_id: params.userId,
       category: params.category,
+      // Only sent when a fix was obtained; the backend treats all three as optional.
+      ...(params.coords && {
+        latitude: params.coords.latitude,
+        longitude: params.coords.longitude,
+        location_accuracy: params.coords.accuracy ?? undefined,
+      }),
     }),
   })
 

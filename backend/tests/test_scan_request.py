@@ -5,6 +5,7 @@ prints), and the legacy two-image fields have to keep working while a deploy
 rolls out, so both are pinned here.
 """
 import pytest
+from pydantic import ValidationError
 
 from app.api.scans import _image_paths
 from app.schemas.scan import MAX_LABEL_IMAGES, ScanRequest
@@ -91,3 +92,28 @@ def test_storage_path_is_preferred_over_the_legacy_columns():
 
 def test_a_row_with_no_evidence_resolves_empty():
     assert _image_paths({}) == []
+
+
+# --------------------------------------------------------------------------
+# Capture coordinates — optional, range-validated
+# --------------------------------------------------------------------------
+
+def test_coordinates_are_accepted_and_optional():
+    req = ScanRequest(image_paths=["a.jpg"], latitude=19.07283, longitude=72.88056, location_accuracy=12.4)
+    assert (req.latitude, req.longitude, req.location_accuracy) == (19.07283, 72.88056, 12.4)
+    # A scan with no location is valid — the officer may deny permission.
+    assert ScanRequest(image_paths=["a.jpg"]).latitude is None
+
+
+def test_zero_zero_is_a_valid_coordinate():
+    req = ScanRequest(image_paths=["a.jpg"], latitude=0.0, longitude=0.0)
+    assert req.latitude == 0.0 and req.longitude == 0.0
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("latitude", 90.1), ("latitude", -90.1), ("longitude", 180.1), ("longitude", -180.1), ("location_accuracy", -1)],
+)
+def test_out_of_range_coordinates_are_rejected(field, value):
+    with pytest.raises(ValidationError):
+        ScanRequest(image_paths=["a.jpg"], **{field: value})

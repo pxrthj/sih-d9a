@@ -123,6 +123,9 @@ class SupabaseService:
         advisories: Optional[List[Dict[str, Any]]] = None,
         user_id: Optional[str] = None,
         category: Optional[str] = None,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
+        location_accuracy: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Insert a row into the Supabase 'scans' table.
@@ -132,9 +135,10 @@ class SupabaseService:
         front_path/back_path are also written, for the first two images only, so
         older readers keep working.
 
-        Optional columns (front_path, back_path, advisories, category) may not
-        exist in a project whose schema.sql has not been re-run; a column error
-        triggers one retry with only the core columns.
+        Optional columns (front_path, back_path, advisories, category, latitude,
+        longitude, location_accuracy) may not exist in a project whose schema.sql
+        has not been re-run; each missing column is dropped and the insert retried,
+        so the rest of the record still saves.
 
         Returns:
             Dict[str, Any]: the inserted database record.
@@ -158,6 +162,14 @@ class SupabaseService:
             optional_payload["advisories"] = advisories
         if category:
             optional_payload["category"] = category
+        # `is not None` (not truthiness): 0.0 is a valid coordinate — the
+        # equator and the prime meridian both read 0.
+        if latitude is not None:
+            optional_payload["latitude"] = latitude
+        if longitude is not None:
+            optional_payload["longitude"] = longitude
+        if location_accuracy is not None:
+            optional_payload["location_accuracy"] = location_accuracy
 
         logger.info(
             f"Saving scan record with {len(image_paths)} image(s) and status='{status}'"

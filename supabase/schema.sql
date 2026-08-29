@@ -33,6 +33,17 @@ alter table public.scans
 alter table public.scans
   add column if not exists advisories jsonb not null default '[]'::jsonb;
 
+-- Capture location (WGS84) of where the scan was taken, read from the device's
+-- geolocation at scan time and printed on the improvement notice. All three are
+-- optional: an officer may deny location permission, or the device may have no
+-- fix, in which case the notice simply omits the location line. The backend
+-- degrades gracefully if these columns are absent (the coordinates are then not
+-- persisted), so re-run this file to start recording them.
+alter table public.scans
+  add column if not exists latitude          double precision,
+  add column if not exists longitude         double precision,
+  add column if not exists location_accuracy double precision;   -- metres
+
 -- ---------------------------------------------------------------------------
 -- 2. profiles table
 -- ---------------------------------------------------------------------------

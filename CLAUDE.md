@@ -19,7 +19,7 @@ Frontend:
 cd frontend && npm run dev
 ```
 
-Tests (99, all should pass):
+Tests (106, all should pass):
 
 ```bash
 cd backend && .\venv\Scripts\python.exe -m pytest

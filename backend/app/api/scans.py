@@ -214,6 +214,12 @@ def create_scan(
             status=compliance_status,
             user_id=user_id,
             category=category,
+            # Capture location is self-reported by the officer's device (unlike
+            # ownership, which comes from the token) and is stored as evidence of
+            # where the inspection took place; it appears on the notice.
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            location_accuracy=payload.location_accuracy,
         )
     except Exception as exc:
         logger.error(f"Failed to write record to Supabase 'scans' table: {exc}")

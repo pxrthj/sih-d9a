@@ -124,6 +124,25 @@ class ScanRequest(BaseModel):
         description="Product category selected by the officer (e.g. 'General', 'Food & Beverages')",
         examples=["General"]
     )
+    # Capture location, read from the officer's device at scan time. Optional:
+    # the officer may deny location permission or the device may have no fix, so
+    # a scan is never blocked on it. Range-validated so a bad reading is rejected
+    # rather than stored. Printed on the notice when present.
+    latitude: Optional[float] = Field(
+        default=None, ge=-90, le=90,
+        description="Latitude in decimal degrees (WGS84) where the scan was taken",
+        examples=[19.07283],
+    )
+    longitude: Optional[float] = Field(
+        default=None, ge=-180, le=180,
+        description="Longitude in decimal degrees (WGS84) where the scan was taken",
+        examples=[72.88056],
+    )
+    location_accuracy: Optional[float] = Field(
+        default=None, ge=0,
+        description="Reported accuracy of the location fix, in metres",
+        examples=[12.5],
+    )
 
     def resolved_paths(self) -> List[str]:
         """The photo paths for this request, trimmed and de-blanked.

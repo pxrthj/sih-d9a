@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { createScan, uploadEvidencePhoto } from '../lib/api'
-import { MAX_LABEL_IMAGES } from '../lib/types'
+import { MAX_LABEL_IMAGES, type CaptureCoords } from '../lib/types'
 import { Banner } from '../components/ui'
-import { CameraIcon, ScanIcon } from '../components/Icons'
+import { CameraIcon, MapPinIcon, ScanIcon } from '../components/Icons'
 
 // Product categories the officer can tag a scan with. All categories run the
 // same 8 Legal Metrology rules today; this list is for classification/record.
@@ -95,6 +95,53 @@ function AddTile({ label, onPick }: { label: string; onPick: (file: File | null)
   )
 }
 
+/** A quiet line telling the officer whether the scan's location was captured. */
+function LocationNote({
+  status,
+  coords,
+  onRetry,
+}: {
+  status: 'locating' | 'ok' | 'denied' | 'unavailable'
+  coords: CaptureCoords | null
+  onRetry: () => void
+}) {
+  const accuracy = coords?.accuracy != null ? ` · ±${Math.round(coords.accuracy)} m` : ''
+  const text =
+    status === 'ok' && coords
+      ? `Location captured${accuracy}`
+      : status === 'locating'
+        ? 'Capturing location…'
+        : status === 'denied'
+          ? 'Location off — the notice won’t show where this was scanned.'
+          : 'Location unavailable on this device.'
+  const tone = status === 'ok' ? 'var(--compliance-ok, #166534)' : 'var(--muted, #6b7280)'
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: tone, marginTop: 10 }}>
+      <MapPinIcon size={16} />
+      <span>{text}</span>
+      {(status === 'denied' || status === 'unavailable') && (
+        <button
+          type="button"
+          onClick={onRetry}
+          style={{
+            marginLeft: 'auto',
+            background: 'none',
+            border: 'none',
+            color: 'var(--primary-deep, #002045)',
+            fontSize: 12.5,
+            fontWeight: 600,
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        >
+          Try again
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function NewScan() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -103,9 +150,48 @@ export default function NewScan() {
   const [submitting, setSubmitting] = useState(false)
   const [stage, setStage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
+  const [coords, setCoords] = useState<CaptureCoords | null>(null)
+  const [locStatus, setLocStatus] = useState<'locating' | 'ok' | 'denied' | 'unavailable'>(
+    'locating',
+  )
 
   const canAddMore = photos.length < MAX_LABEL_IMAGES
   const canSubmit = photos.length > 0 && !!user && !submitting
+
+  // Read the device's coordinates. Resolves to null (never rejects) if location
+  // is unsupported, denied, or times out — a scan is never blocked on it.
+  const captureLocation = useCallback((): Promise<CaptureCoords | null> => {
+    if (!('geolocation' in navigator)) {
+      setLocStatus('unavailable')
+      return Promise.resolve(null)
+    }
+    setLocStatus('locating')
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const c: CaptureCoords = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
+          }
+          setCoords(c)
+          setLocStatus('ok')
+          resolve(c)
+        },
+        (err) => {
+          setLocStatus(err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable')
+          resolve(null)
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+      )
+    })
+  }, [])
+
+  // Ask for location when the scan screen opens, so the browser's permission
+  // prompt is separate from tapping "Scan".
+  useEffect(() => {
+    void captureLocation()
+  }, [captureLocation])
 
   function addPhoto(file: File | null) {
     if (!file) return
@@ -134,8 +220,11 @@ export default function NewScan() {
       // Upload in parallel, but keep the officer's capture order.
       const imagePaths = await Promise.all(photos.map((file) => uploadEvidencePhoto(file)))
 
+      // Use a fix we already have, else make one last attempt. Never blocks.
+      const location = coords ?? (await captureLocation())
+
       setStage('Extracting declarations & checking rules…')
-      const result = await createScan({ imagePaths, userId: user.id, category })
+      const result = await createScan({ imagePaths, userId: user.id, category, coords: location })
 
       navigate('/results', { state: { result } })
     } catch (e) {
@@ -220,6 +309,8 @@ export default function NewScan() {
           reported as missing. Add up to {MAX_LABEL_IMAGES} &mdash; and if the MRP, use-by date and
           lot number are crammed into one tiny box, add a close-up of it.
         </p>
+
+        <LocationNote status={locStatus} coords={coords} onRetry={captureLocation} />
       </div>
 
       <div>
