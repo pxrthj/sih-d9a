@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 from pathlib import Path
 from typing import List
 from dotenv import load_dotenv
@@ -57,7 +58,12 @@ class Settings(BaseModel):
             raise ValueError(f"Missing required environment variables in .env: {', '.join(missing)}")
 
 
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    # Cached: settings are static per process, so this reads the environment and
+    # re-validates the keys once instead of on every request (it is a FastAPI
+    # dependency on every endpoint). Tests override the dependency, so the cache
+    # does not get in their way.
     settings = Settings()
     settings.validate_keys()
     return settings

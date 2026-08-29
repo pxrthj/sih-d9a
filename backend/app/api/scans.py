@@ -1,6 +1,7 @@
 import logging
 import time
 from collections import defaultdict
+from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from app.schemas.scan import MAX_LABEL_IMAGES, ScanRequest, ScanResponse
@@ -15,12 +16,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/scans", tags=["scans"])
 
 
-def get_supabase_service(settings: Settings = Depends(get_settings)) -> SupabaseService:
-    return SupabaseService(settings=settings)
+# One Supabase client and one Gemini client per process, built lazily on first
+# use. Constructing them per request rebuilt an httpx connection pool every time;
+# reusing a single client is both faster and how these SDKs are meant to be held.
+# The dependency wrappers stay as functions so tests can still override them.
+@lru_cache(maxsize=1)
+def _shared_supabase_service() -> SupabaseService:
+    return SupabaseService(settings=get_settings())
 
 
-def get_gemini_service(settings: Settings = Depends(get_settings)) -> GeminiService:
-    return GeminiService(settings=settings)
+@lru_cache(maxsize=1)
+def _shared_gemini_service() -> GeminiService:
+    return GeminiService(settings=get_settings())
+
+
+def get_supabase_service() -> SupabaseService:
+    return _shared_supabase_service()
+
+
+def get_gemini_service() -> GeminiService:
+    return _shared_gemini_service()
 
 
 def get_current_user(
@@ -74,29 +89,42 @@ _VERIFY_LIMIT_MAX = 60
 _VERIFY_LIMIT_WINDOW = 60.0
 
 
-def _enforce_verify_rate_limit(client_ip: str) -> None:
+def _rate_limit_hit(
+    store: Dict[str, List[float]], key: str, max_calls: int, window: float
+) -> bool:
+    """Sliding-window check shared by both limiters. Returns True when `key` is
+    over the limit; otherwise records this call and returns False.
+
+    Also evicts keys whose most recent call has aged out, so the store cannot
+    grow without bound one entry per user/IP forever. Checking only the last
+    (newest) timestamp keeps that eviction O(1) per key.
+    """
     now = time.time()
-    calls = _VERIFY_CALLS[client_ip]
-    calls[:] = [t for t in calls if t > now - _VERIFY_LIMIT_WINDOW]
-    if len(calls) >= _VERIFY_LIMIT_MAX:
+    cutoff = now - window
+    for idle in [k for k, ts in store.items() if not ts or ts[-1] <= cutoff]:
+        del store[idle]
+    calls = store[key]
+    calls[:] = [t for t in calls if t > cutoff]
+    if len(calls) >= max_calls:
+        return True
+    calls.append(now)
+    return False
+
+
+def _enforce_verify_rate_limit(client_ip: str) -> None:
+    if _rate_limit_hit(_VERIFY_CALLS, client_ip, _VERIFY_LIMIT_MAX, _VERIFY_LIMIT_WINDOW):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many verification requests. Please wait a moment.",
         )
-    calls.append(now)
 
 
 def _enforce_scan_rate_limit(user_id: str) -> None:
-    now = time.time()
-    cutoff = now - _RATE_LIMIT_WINDOW
-    calls = _SCAN_CALLS[user_id]
-    calls[:] = [t for t in calls if t > cutoff]
-    if len(calls) >= _RATE_LIMIT_MAX:
+    if _rate_limit_hit(_SCAN_CALLS, user_id, _RATE_LIMIT_MAX, _RATE_LIMIT_WINDOW):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many scans in a short time. Please wait a moment and try again.",
         )
-    calls.append(now)
 
 
 @router.post(

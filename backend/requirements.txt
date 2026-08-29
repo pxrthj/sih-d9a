@@ -1,10 +1,14 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
-supabase>=2.10.0
-google-genai>=2.0.0
-pydantic>=2.9.0
-python-dotenv>=1.0.0
-httpx>=0.27.0
-xhtml2pdf>=0.2.17
-jinja2>=3.1.0
-qrcode>=8.0
+# Pinned to exact versions. Render rebuilds this on every deploy, so an
+# unpinned `>=` let a fresh build pull a new major (google-genai, supabase,
+# pydantic) and break the app between two deploys of identical code. Bump these
+# deliberately and re-test — never let the build float.
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+supabase==2.31.0
+google-genai==2.19.0
+pydantic==2.13.4
+python-dotenv==1.2.3
+httpx==0.28.1
+xhtml2pdf==0.2.17
+jinja2==3.1.6
+qrcode==8.2
