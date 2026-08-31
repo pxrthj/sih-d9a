@@ -891,6 +891,43 @@ a {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
+/* ---------- Record detail (two-column) ---------- */
+.admin-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 7px 12px 7px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.admin-back:hover {
+  background: var(--surface-container);
+  color: var(--primary);
+}
+.admin-detail__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+.admin-detail__side {
+  position: sticky;
+  top: 32px;
+}
+/* On a narrow desktop window the side column would get too tight — stack it. */
+@media (max-width: 1040px) {
+  .admin-detail__grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-detail__side {
+    position: static;
+  }
+}
+
 /* ---------- Small-screen gate ---------- */
 .admin-gate {
   display: none;

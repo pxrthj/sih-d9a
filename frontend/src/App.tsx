@@ -42,8 +42,10 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Scan detail is full-screen (its own app bar) */}
-      <Route path="/scan/:id" element={<ScanDetail />} />
+      {/* Officers view a record as a standalone full-screen page. Admins view it
+          inside the desktop console, so their /scan/:id route lives in the
+          layout group below. */}
+      {!isAdmin && <Route path="/scan/:id" element={<ScanDetail />} />}
 
       {/* Everything else shares a shell. Officers get the mobile app; admins get
           the desktop console. Both mount the same child routes. */}
@@ -56,6 +58,7 @@ export default function App() {
         <Route path="/history" element={<History />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/users" element={<Users />} />
+        {isAdmin && <Route path="/scan/:id" element={<ScanDetail />} />}
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
