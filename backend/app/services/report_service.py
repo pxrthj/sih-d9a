@@ -12,7 +12,6 @@ This module is READ-ONLY with respect to scan data. It never mutates a record.
 import base64
 import io
 import logging
-from pathlib import Path
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional, Tuple
@@ -40,64 +39,74 @@ NOTICE_HTML = """
 <head>
 <meta charset="utf-8" />
 <style>
-  @page { size: a4 portrait; margin: 1.4cm 1.5cm; }
-  body { font-family: Helvetica, Arial, sans-serif; color: #1a1c1e; font-size: 10pt; }
-  .bar { background-color: #002045; color: #ffffff; padding: 12pt 14pt; }
-  .bar .title { font-size: 16pt; font-weight: bold; }
-  .bar .sub { font-size: 8.5pt; color: #b9c7dd; }
-  .doc-title { font-size: 13pt; font-weight: bold; color: #002045;
-    text-align: center; margin: 14pt 0 2pt 0; letter-spacing: 0.5pt; }
-  .doc-sub { text-align: center; font-size: 8.5pt; color: #43474e; margin-bottom: 12pt; }
+  /* A deliberately monochrome document. The single exception is the compliance
+     verdict block, which stays green/red so the finding reads at a glance —
+     everything else is black on white in the register of an official notice. */
+  @page { size: a4 portrait; margin: 1.5cm 1.6cm; }
+  body { font-family: "Times New Roman", Times, Georgia, serif; color: #1a1a1a; font-size: 10.5pt; line-height: 1.4; }
   table { border-collapse: collapse; width: 100%; }
+
+  .doc-title { font-size: 15pt; font-weight: bold; text-align: center;
+    letter-spacing: 0.5pt; margin: 0 0 4pt 0; }
+  .doc-sub { text-align: center; font-size: 9pt; color: #555; margin-bottom: 2pt; }
+
+  .refbar { margin-top: 14pt; border-top: 0.75pt solid #1a1a1a; border-bottom: 0.75pt solid #1a1a1a; }
+  .refbar td { padding: 6pt 2pt; vertical-align: middle; }
+  .refbar .lbl { font-size: 7.5pt; letter-spacing: 0.8pt; text-transform: uppercase; color: #555; }
+  .refbar .val { font-size: 11pt; font-weight: bold; padding-top: 1pt; }
+
   .meta td { padding: 3pt 6pt; font-size: 9.5pt; vertical-align: top; }
-  .meta .k { color: #43474e; width: 33%; }
+  .meta .k { color: #555; width: 34%; }
   .meta .v { font-weight: bold; }
-  .section-h { font-size: 10pt; font-weight: bold; color: #002045;
-    border-bottom: 1.5pt solid #002045; padding-bottom: 3pt; margin: 16pt 0 8pt 0; }
+  .meta .sub { font-size: 8pt; color: #555; font-weight: normal; padding-top: 2pt; }
+
+  .section-h { font-size: 9.5pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.8pt;
+    border-bottom: 1pt solid #1a1a1a; padding-bottom: 3pt; margin: 16pt 0 8pt 0; }
+
+  /* The one intentional splash of colour. */
   .verdict { padding: 10pt 12pt; color: #ffffff; }
   .verdict.compliant { background-color: #166534; }
   .verdict.flagged { background-color: #991b1b; }
-  .verdict .lbl { font-size: 8pt; letter-spacing: 1pt; }
+  .verdict .lbl { font-size: 7.5pt; letter-spacing: 1.5pt; text-transform: uppercase; }
   .verdict .st { font-size: 15pt; font-weight: bold; }
-  .vtable th { background-color: #002045; color: #ffffff; text-align: left;
-    padding: 5pt 7pt; font-size: 8.5pt; }
-  .vtable td { border: 0.75pt solid #c4c6cf; padding: 5pt 7pt; font-size: 9pt; vertical-align: top; }
-  .vtable .rule { font-weight: bold; color: #002045; white-space: nowrap; }
-  .ok-box { border: 0.75pt solid #bbf7d0; background-color: #f0fdf4;
-    padding: 8pt 10pt; font-size: 9.5pt; color: #166534; }
+
+  .vtable th { background-color: #ececec; color: #1a1a1a; text-align: left;
+    padding: 5pt 7pt; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5pt;
+    border: 0.75pt solid #999; }
+  .vtable td { border: 0.75pt solid #bbb; padding: 5pt 7pt; font-size: 9pt; vertical-align: top; }
+  .vtable .rule { font-weight: bold; white-space: nowrap; }
+
+  .ok-box { border: 0.75pt solid #999; background-color: #f5f5f5;
+    padding: 8pt 10pt; font-size: 9.5pt; }
+  .cap { font-size: 8pt; color: #555; }
   .photos td { width: 50%; padding: 4pt; text-align: center; vertical-align: top; }
-  .photos .cap { font-size: 8pt; color: #43474e; padding-top: 3pt; }
-  .photo-frame { border: 0.75pt solid #c4c6cf; padding: 3pt; }
-  .no-photo { border: 0.75pt dashed #c4c6cf; color: #74777f; padding: 24pt 4pt;
+  .photos .cap { padding-top: 3pt; }
+  .photo-frame { border: 0.75pt solid #999; padding: 3pt; }
+  .no-photo { border: 0.75pt dashed #999; color: #777; padding: 24pt 4pt;
     font-size: 8.5pt; text-align: center; }
-  .note { border: 0.75pt solid #c4c6cf; background-color: #f7f9fb;
-    padding: 10pt 12pt; font-size: 9.5pt; line-height: 1.5; }
-  .note strong { color: #002045; }
-  .sign td { padding-top: 26pt; font-size: 9pt; width: 50%; vertical-align: bottom; }
-  .sign .line { border-top: 0.75pt solid #43474e; padding-top: 3pt; color: #43474e; }
-  .footer { color: #74777f; font-size: 7.5pt; text-align: center;
-    border-top: 0.5pt solid #c4c6cf; padding-top: 5pt; margin-top: 18pt; }
+  .note { border: 0.75pt solid #999; background-color: #f7f7f7;
+    padding: 10pt 12pt; font-size: 9.5pt; line-height: 1.55; }
+
+  .sign td { padding-top: 30pt; font-size: 9pt; width: 50%; vertical-align: bottom; }
+  .sign .line { border-top: 0.75pt solid #1a1a1a; padding-top: 3pt; color: #555; }
+  .footer { color: #777; font-size: 7.5pt; text-align: center;
+    border-top: 0.5pt solid #999; padding-top: 5pt; margin-top: 18pt; }
   .avoid-break { -pdf-keep-with-next: true; page-break-inside: avoid; }
 </style>
 </head>
 <body>
 
-  <table class="bar"><tr>
-    {% if logo_uri %}<td style="width:1.5cm; vertical-align:middle;"><img src="{{ logo_uri }}" style="width:1.25cm; height:1.25cm;" /></td>{% endif %}
-    <td style="vertical-align:middle;"><div class="title">ParakhMitra</div><div class="sub">Legal Metrology Compliance</div></td>
-    <td style="text-align:right; vertical-align:top;">
-      <div style="font-size:8pt; color:#b9c7dd;">NOTICE REF.</div>
-      <div style="font-size:9.5pt; font-weight:bold;">{{ notice_ref }}</div>
-    </td>
-  </tr></table>
-
   <div class="doc-title">LEGAL METROLOGY IMPROVEMENT NOTICE</div>
   <div class="doc-sub">Issued under the Legal Metrology (Packaged Commodities) Rules, 2011</div>
 
+  <table class="refbar"><tr>
+    <td style="width:50%;"><div class="lbl">Notice Reference</div><div class="val">{{ notice_ref }}</div></td>
+    <td style="width:50%; text-align:right;"><div class="lbl">Date of Notice</div><div class="val">{{ notice_date }}</div></td>
+  </tr></table>
+
   <table class="meta">
-    <tr><td class="k">Date of notice</td><td class="v">{{ notice_date }}</td></tr>
     <tr><td class="k">Inspection date</td><td class="v">{{ inspection_date }}</td></tr>
-    {% if location %}<tr><td class="k">Inspection location</td><td class="v">{{ location.coords }}<div style="font-size:8pt; color:#1960a3; font-weight:normal; padding-top:2pt;">{{ location.maps_url }}</div></td></tr>{% endif %}
+    {% if location %}<tr><td class="k">Inspection location</td><td class="v">{{ location.coords }}<div class="sub">{{ location.maps_url }}</div></td></tr>{% endif %}
     <tr><td class="k">Inspecting officer</td><td class="v">{{ officer_name }}{% if officer_email %} &lt;{{ officer_email }}&gt;{% endif %}</td></tr>
     <tr><td class="k">Product category</td><td class="v">{{ category }}</td></tr>
     <tr><td class="k">Addressed to (Mfr/Packer/Importer)</td><td class="v">{{ packer }}</td></tr>
@@ -108,15 +117,15 @@ NOTICE_HTML = """
     {% if lot_batch_number %}<tr><td class="k">Lot / batch number</td><td class="v">{{ lot_batch_number }}</td></tr>{% endif %}
   </table>
 
-  <div class="section-h">COMPLIANCE VERDICT</div>
+  <div class="section-h">Compliance Verdict</div>
   <table><tr><td>
     <div class="verdict {{ 'compliant' if is_compliant else 'flagged' }}">
-      <div class="lbl">STATUS</div>
+      <div class="lbl">Status</div>
       <div class="st">{{ status_label }}</div>
     </div>
   </td></tr></table>
 
-  <div class="section-h">DECLARED CONTRAVENTIONS</div>
+  <div class="section-h">Declared Contraventions</div>
   {% if violations %}
   <table class="vtable">
     <tr><th style="width:24%">Declaration</th><th>Deficiency observed</th><th style="width:22%">Rule cited</th></tr>
@@ -133,7 +142,7 @@ NOTICE_HTML = """
   {% endif %}
 
   {% if advisories %}
-  <div class="section-h">OBSERVATIONS FOR VERIFICATION</div>
+  <div class="section-h">Observations for Verification</div>
   <table class="vtable">
     <tr><th style="width:24%">Subject</th><th>Observation</th><th style="width:22%">Reference</th></tr>
     {% for a in advisories %}
@@ -150,7 +159,7 @@ NOTICE_HTML = """
   {% endif %}
 
   <div class="avoid-break">
-  <div class="section-h">EVIDENCE ON RECORD</div>
+  <div class="section-h">Evidence on Record</div>
   {% if photo_rows %}
   {% for row in photo_rows %}
   <table class="photos"><tr>
@@ -168,7 +177,7 @@ NOTICE_HTML = """
   {% endif %}
   </div>
 
-  <div class="section-h">NOTICE</div>
+  <div class="section-h">Notice</div>
   <div class="note">
   {% if is_compliant %}
     On inspection, the package named above was found to <strong>comply</strong> with the checked
@@ -187,13 +196,13 @@ NOTICE_HTML = """
   <table style="margin-top:14pt;"><tr>
     <td style="width:2.6cm; vertical-align:top;"><img src="{{ qr_uri }}" style="width:2.3cm; height:2.3cm;" /></td>
     <td style="vertical-align:top; padding-left:8pt;">
-      <div style="font-size:9pt; font-weight:bold; color:#002045;">VERIFY THIS NOTICE</div>
-      <div style="font-size:8.5pt; color:#43474e; padding-top:3pt;">
+      <div style="font-size:9pt; font-weight:bold;">VERIFY THIS NOTICE</div>
+      <div style="font-size:8.5pt; color:#555; padding-top:3pt;">
         Scan the code, or visit the address below, to check this notice against the
         original inspection record. The record cannot be altered after it is created,
         so any discrepancy means this document has been modified.
       </div>
-      <div style="font-size:8pt; color:#1960a3; padding-top:4pt;">{{ verify_url }}</div>
+      <div style="font-size:8pt; color:#555; padding-top:4pt;">{{ verify_url }}</div>
     </td>
   </tr></table>
   {% endif %}
@@ -210,20 +219,6 @@ NOTICE_HTML = """
 </body>
 </html>
 """
-
-# The masthead logo, embedded as a data URI so the notice stays a single
-# self-contained file with no external requests. Flattened onto the header navy
-# rather than kept transparent: xhtml2pdf's PNG alpha handling is unreliable.
-def _load_logo_uri() -> Optional[str]:
-    path = Path(__file__).resolve().parent.parent / "assets" / "logo-notice.png"
-    try:
-        return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
-    except Exception as exc:
-        logger.warning("Notice logo unavailable (%s); falling back to the wordmark.", exc)
-        return None
-
-
-LOGO_URI = _load_logo_uri()
 
 
 _env = Environment(loader=BaseLoader(), autoescape=select_autoescape(["html", "xml"]))
@@ -410,7 +405,6 @@ def generate_notice_pdf(
 
     now = datetime.now(IST)
     context = {
-        "logo_uri": LOGO_URI,
         "notice_ref": _notice_ref(scan),
         "record_id": str(scan.get("id", "-")),
         "verify_url": verify_url,

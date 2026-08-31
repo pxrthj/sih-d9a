@@ -86,7 +86,7 @@ backend/app/
   services/gemini_service.py   one call, all images, structured output, media_resolution=HIGH
   services/supabase_service.py storage + db; create_signed_url() and the column-degrading insert
   services/report_service.py   Jinja2 -> xhtml2pdf notice; IST dates, notice ref, QR, base64 images
-  assets/logo-notice.png  masthead logo, pre-flattened onto the header navy
+  assets/logo-notice.png  legacy notice masthead logo — no longer used (the notice is now text-only)
 backend/tests/            pytest; start here when changing the engine
 backend/experiments/      OCR baseline, kept as evidence. Not imported by the app.
 frontend/src/
@@ -130,8 +130,9 @@ These are things the code doesn't tell you and that have cost time before:
 - **`GEMINI_MODEL` defaults to `gemini-3.5-flash`.** Flash-Lite is cheaper but loses the small
   ink-jet MRP/batch blocks, which is the whole point of the extraction. Don't downgrade it to
   save money without re-testing that case.
-- **xhtml2pdf can't render SVG and is unreliable with PNG alpha.** That is why the notice logo is
-  a PNG pre-flattened onto the header navy, and why every image in the PDF is a base64 data URI.
+- **xhtml2pdf can't render SVG and is unreliable with PNG alpha.** That is why every image in the
+  PDF is a base64 JPEG/PNG data URI. (The notice itself is now text-only and monochrome — the only
+  colour is the compliance verdict block — so there is no masthead image to flatten any more.)
 - **A scan takes several seconds**, almost all of it the Gemini call at high media resolution plus
   moving several MB of photos. The rule engine is microseconds. Don't go optimising the rules.
 
