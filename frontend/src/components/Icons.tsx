@@ -143,3 +143,11 @@ export const MapPinIcon = ({ size = 20, className }: IconProps) => (
     <circle cx="12" cy="10" r="3" />
   </svg>
 )
+
+export const MonitorIcon = ({ size = 24, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <rect x="2" y="3" width="20" height="14" rx="2" />
+    <path d="M8 21h8" />
+    <path d="M12 17v4" />
+  </svg>
+)

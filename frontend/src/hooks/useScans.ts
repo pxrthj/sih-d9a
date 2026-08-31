@@ -3,16 +3,18 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthContext'
 import type { ScanRecord } from '../lib/types'
 
-// The `advisories` column is added by a later revision of supabase/schema.sql.
-// Select it when it exists and fall back when it does not, so the app keeps
-// working against a project whose schema has not been re-run yet.
-const SCAN_COLUMNS =
-  'id, created_at, storage_path, extracted, violations, advisories, status, user_id, category'
-const SCAN_COLUMNS_LEGACY =
-  'id, created_at, storage_path, extracted, violations, status, user_id, category'
+// Candidate column sets, widest first. Later revisions of supabase/schema.sql
+// added optional columns (advisories, then latitude/longitude/location_accuracy);
+// each fallback drops the columns a not-yet-migrated database may lack, so the
+// app keeps working while a migration rolls out.
+const COLUMN_SETS = [
+  'id, created_at, storage_path, extracted, violations, advisories, status, user_id, category, latitude, longitude, location_accuracy',
+  'id, created_at, storage_path, extracted, violations, advisories, status, user_id, category',
+  'id, created_at, storage_path, extracted, violations, status, user_id, category',
+]
 
 function isMissingColumn(message?: string | null): boolean {
-  return !!message && /column .*advisories.* does not exist/i.test(message)
+  return !!message && /column .* does not exist/i.test(message)
 }
 
 interface UseScansResult {
@@ -54,9 +56,11 @@ export function useScans(limit?: number): UseScansResult {
         return q
       }
 
-      let { data, error: err } = await build(SCAN_COLUMNS)
-      if (err && isMissingColumn(err.message)) {
-        ;({ data, error: err } = await build(SCAN_COLUMNS_LEGACY))
+      let data = null
+      let err = null
+      for (const columns of COLUMN_SETS) {
+        ;({ data, error: err } = await build(columns))
+        if (!err || !isMissingColumn(err.message)) break
       }
       if (!active) return
       if (err) {
@@ -94,9 +98,11 @@ export function useScan(id: string | undefined) {
       const build = (columns: string) =>
         supabase.from('scans').select(columns).eq('id', id).maybeSingle()
 
-      let { data, error: err } = await build(SCAN_COLUMNS)
-      if (err && isMissingColumn(err.message)) {
-        ;({ data, error: err } = await build(SCAN_COLUMNS_LEGACY))
+      let data = null
+      let err = null
+      for (const columns of COLUMN_SETS) {
+        ;({ data, error: err } = await build(columns))
+        if (!err || !isMissingColumn(err.message)) break
       }
       if (!active) return
       if (err) setError(err.message)

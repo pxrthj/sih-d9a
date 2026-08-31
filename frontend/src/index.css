@@ -758,6 +758,188 @@ a {
   }
 }
 
+/* ============================================================
+   Admin desktop console
+   A separate shell for admins only. Officers keep the mobile
+   app above; everything here is scoped under .admin-* so none
+   of the officer styles are affected.
+   ============================================================ */
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--surface);
+}
+
+/* ---------- Sidebar ---------- */
+.admin-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  background: var(--primary-deep);
+  color: var(--on-primary);
+  display: flex;
+  flex-direction: column;
+  padding: 22px 16px;
+}
+.admin-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 4px 8px 24px;
+}
+.admin-sidebar__logo {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: #fff;
+}
+.admin-sidebar__title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.admin-sidebar__subtitle {
+  font-size: 10.5px;
+  font-weight: 500;
+  opacity: 0.7;
+  letter-spacing: 0.02em;
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.admin-navitem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.admin-navitem:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.admin-navitem--active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-weight: 600;
+}
+
+.admin-sidebar__footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.admin-sidebar__scope {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  margin-bottom: 14px;
+}
+.admin-sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.admin-sidebar__usermeta {
+  min-width: 0;
+}
+.admin-sidebar__username {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-sidebar__userrole {
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+/* ---------- Content area ---------- */
+.admin-main {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.admin-content {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 32px 40px 56px;
+}
+/* In the wide console the stats read as a KPI row rather than the stacked
+   mobile grid (the full-width spans are dropped for admins in Dashboard.tsx). */
+.admin-content .stat-grid {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+/* ---------- Small-screen gate ---------- */
+.admin-gate {
+  display: none;
+}
+.admin-gate__card {
+  max-width: 420px;
+  text-align: center;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  padding: 36px 28px;
+}
+.admin-gate__icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--surface-container);
+  color: var(--primary);
+}
+.admin-gate__title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+}
+.admin-gate__text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--on-surface-variant);
+  margin: 0;
+}
+
+/* Below this width the console is replaced by the gate. */
+@media (max-width: 899px) {
+  .admin-shell {
+    display: none;
+  }
+  .admin-gate {
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    padding: 28px;
+  }
+}
+
 /* ---------- Misc utility ---------- */
 .stack > * + * {
   margin-top: 16px;

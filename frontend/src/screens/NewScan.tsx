@@ -226,7 +226,7 @@ export default function NewScan() {
       setStage('Extracting declarations & checking rules…')
       const result = await createScan({ imagePaths, userId: user.id, category, coords: location })
 
-      navigate('/results', { state: { result } })
+      navigate('/results', { state: { result, coords: location } })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Scan failed. Please try again.')
       setSubmitting(false)

@@ -10,8 +10,8 @@ import {
   EvidencePhotos,
 } from '../components/ScanResult'
 import { Banner, EmptyState, Spinner } from '../components/ui'
-import { ChevronLeft, InboxIcon, DownloadIcon } from '../components/Icons'
-import { formatDateTime, scanTitle, violationCount } from '../lib/format'
+import { ChevronLeft, InboxIcon, DownloadIcon, MapPinIcon } from '../components/Icons'
+import { formatDateTime, formatLocation, scanTitle, violationCount } from '../lib/format'
 
 /**
  * Evidence photos for a record. The bucket is private, so the backend mints
@@ -130,6 +130,29 @@ export default function ScanDetail() {
                   {formatDateTime(scan.created_at)}
                 </span>
               </div>
+              {(() => {
+                const loc = formatLocation(scan)
+                if (!loc) return null
+                return (
+                  <a
+                    href={loc.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="muted"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12.5,
+                      marginTop: 8,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <MapPinIcon size={15} />
+                    {loc.text}
+                  </a>
+                )
+              })()}
             </div>
 
             <VerdictBanner status={scan.status} violationCount={violationCount(scan)} />

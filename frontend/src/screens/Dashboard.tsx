@@ -31,7 +31,8 @@ export default function Dashboard() {
           </div>
           <h1 className="headline">{firstName}</h1>
         </div>
-        <Avatar src={avatarUrl} name={googleName} size={46} />
+        {/* The desktop console already shows the admin's identity in the sidebar. */}
+        {!isAdmin && <Avatar src={avatarUrl} name={googleName} size={46} />}
       </div>
 
       {isAdmin && (
@@ -60,12 +61,12 @@ export default function Dashboard() {
           <div className="stat__value">{loading ? '—' : compliant}</div>
           <div className="stat__label">Compliant</div>
         </div>
-        <div className="stat stat--error" style={{ gridColumn: '1 / -1' }}>
+        <div className="stat stat--error" style={isAdmin ? undefined : { gridColumn: '1 / -1' }}>
           <div className="stat__value">{loading ? '—' : flagged}</div>
           <div className="stat__label">Flagged for violations</div>
         </div>
         {!loading && breach && (
-          <div className="stat stat--accent" style={{ gridColumn: '1 / -1' }}>
+          <div className="stat stat--accent" style={isAdmin ? undefined : { gridColumn: '1 / -1' }}>
             <div className="stat__value">{breach.ruleRef}</div>
             <div className="stat__label">
               Most-breached rule · {fieldLabel(breach.field)} · {breach.share}% of flagged packages

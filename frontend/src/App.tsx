@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
 import { FullScreenLoader } from './components/ui'
 import Layout from './components/Layout'
+import AdminLayout from './components/AdminLayout'
 import Login from './screens/Login'
 import AccessDenied from './screens/AccessDenied'
 import Dashboard from './screens/Dashboard'
@@ -44,8 +45,9 @@ export default function App() {
       {/* Scan detail is full-screen (its own app bar) */}
       <Route path="/scan/:id" element={<ScanDetail />} />
 
-      {/* Everything else shares the app shell + bottom nav */}
-      <Route element={<Layout />}>
+      {/* Everything else shares a shell. Officers get the mobile app; admins get
+          the desktop console. Both mount the same child routes. */}
+      <Route element={isAdmin ? <AdminLayout /> : <Layout />}>
         <Route path="/" element={<Dashboard />} />
         {/* Scanning is officer-only. Admins are redirected to their dashboard,
             even on direct-URL access. */}

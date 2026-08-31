@@ -1,12 +1,14 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import type { ScanResponse } from '../lib/types'
+import type { CaptureCoords, ScanResponse } from '../lib/types'
 import { VerdictBanner, ExtractedFields, ViolationList, AdvisoryList } from '../components/ScanResult'
-import { HomeIcon, ScanIcon } from '../components/Icons'
+import { HomeIcon, MapPinIcon, ScanIcon } from '../components/Icons'
+import { formatLocation } from '../lib/format'
 
 export default function Results() {
   const location = useLocation()
   const navigate = useNavigate()
-  const result = (location.state as { result?: ScanResponse } | null)?.result
+  const state = location.state as { result?: ScanResponse; coords?: CaptureCoords | null } | null
+  const result = state?.result
 
   // Direct navigation / refresh loses the in-memory result — send back to scan.
   if (!result) {
@@ -14,6 +16,13 @@ export default function Results() {
   }
 
   const violations = result.violations ?? []
+  const loc = state?.coords
+    ? formatLocation({
+        latitude: state.coords.latitude,
+        longitude: state.coords.longitude,
+        location_accuracy: state.coords.accuracy,
+      })
+    : null
 
   return (
     <div className="stack">
@@ -22,6 +31,19 @@ export default function Results() {
       </div>
 
       <VerdictBanner status={result.status} violationCount={violations.length} />
+
+      {loc && (
+        <a
+          href={loc.mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="muted"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, textDecoration: 'none' }}
+        >
+          <MapPinIcon size={15} />
+          Scanned at {loc.text}
+        </a>
+      )}
 
       <div>
         <div className="section-label">Violations</div>

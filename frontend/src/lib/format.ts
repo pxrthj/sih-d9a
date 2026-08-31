@@ -55,6 +55,23 @@ export function violationCount(scan: ScanRecord): number {
   return Array.isArray(scan.violations) ? scan.violations.length : 0
 }
 
+/**
+ * Capture location for display, or null if the scan has no coordinates (the
+ * officer denied permission, the device had no fix, or the DB predates the
+ * location columns). `0,0` is a valid coordinate and is kept.
+ */
+export function formatLocation(
+  scan: Pick<ScanRecord, 'latitude' | 'longitude' | 'location_accuracy'>,
+): { text: string; mapsUrl: string } | null {
+  const { latitude: lat, longitude: lng, location_accuracy: acc } = scan
+  if (lat == null || lng == null) return null
+  const accuracy = acc != null ? ` · ±${Math.round(acc)} m` : ''
+  return {
+    text: `${lat.toFixed(6)}, ${lng.toFixed(6)}${accuracy}`,
+    mapsUrl: `https://www.google.com/maps?q=${lat},${lng}`,
+  }
+}
+
 /** The rule breached most often across a set of scans. */
 export interface TopBreach {
   ruleRef: string
