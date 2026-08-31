@@ -9,7 +9,7 @@ The output shape is unchanged: a list of Violation{ field, issue, rule_ref } and
 an overall status ("compliant" when there are no violations, else "flagged").
 
 HOW TO EDIT (for non-programmers / the legal team):
-  - The 8 rules live in the RULES list at the bottom. Each entry has a plain-
+  - The 11 rules live in the RULES list at the bottom. Each entry has a plain-
     English `issue`, its `rule_ref`, and a small `check` function.
   - To change wording, edit the `issue` / `rule_ref` strings.
   - To change what counts as a valid unit, edit STANDARD_UNITS / UNIT_ALIASES /
@@ -22,6 +22,7 @@ and they never change the compliance status. Anything we can see in a photo but
 cannot adjudicate from one belongs there, not in RULES.
 """
 
+import re
 from typing import Callable, Dict, List, Optional, Tuple
 from app.schemas.scan import Advisory, ExtractedData, Violation
 
@@ -45,6 +46,31 @@ UNIT_ALIASES = {
     "nos": "n", "no": "n", "unit": "u", "units": "u", "count": "u",
 }
 
+# Month spellings accepted in a date declaration (Rule 6(1)(d)). Listed in full
+# rather than matched by prefix, so "March" counts as a month and "Marketed"
+# does not.
+MONTH_WORDS = {
+    "jan", "january", "feb", "february", "mar", "march", "apr", "april",
+    "may", "jun", "june", "jul", "july", "aug", "august",
+    "sep", "sept", "september", "oct", "october", "nov", "november",
+    "dec", "december",
+}
+
+# Spellings the extractor may return for `declaration_language`, normalised to
+# 'english', 'hindi', 'both' or 'other' (Rule 9(4)).
+LANGUAGE_ALIASES = {
+    "en": "english", "eng": "english",
+    "hi": "hindi", "devnagri": "hindi", "devanagari": "hindi",
+    "hindi (devanagari)": "hindi", "hindi (devnagri)": "hindi",
+    "hindi and english": "both", "english and hindi": "both", "bilingual": "both",
+    "neither": "other", "none": "other",
+}
+
+# Only a positive report of "other" breaches Rule 9(4). Anything else — including
+# a language the extractor did not report — leaves the rule silent.
+NON_COMPLIANT_LANGUAGES = {"other"}
+
+
 # Explicitly prohibited (non-standard) units under Rule 13(4).
 NON_STANDARD_UNITS = {
     "dozen", "dozens", "doz",
@@ -67,6 +93,47 @@ def _canonical_unit(unit: str) -> str:
     """Lowercase, trim, drop a trailing period, and apply spelling aliases."""
     u = (unit or "").strip().lower().rstrip(".")
     return UNIT_ALIASES.get(u, u)
+
+
+def _canonical_language(value: Optional[str]) -> Optional[str]:
+    """Normalise a reported declaration language, or None when nothing was reported."""
+    lang = (value or "").strip().lower()
+    if not lang:
+        return None
+    return LANGUAGE_ALIASES.get(lang, lang)
+
+
+_WORDS = re.compile(r"[a-z]+")
+_DIGITS = re.compile(r"\d+")
+
+
+def _states_month_and_year(text: str) -> bool:
+    """True when a printed date carries BOTH a month and a year.
+
+    Rule 6(1)(d) asks for "the month and year in which the commodity is
+    manufactured or pre-packed", so "06/2026" and "JUN 2026" qualify while a
+    bare "2026" or an ink-jetted "24" does not.
+
+    Deliberately tolerant about separators and spelling — it decides whether a
+    month and a year are present, not whether the date follows any house style.
+    Where a two-number date is ambiguous ("26/06" could be a day and a month
+    with no year at all) it passes: on a document that becomes a legal notice,
+    under-flagging is the safer error.
+    """
+    lowered = text.lower()
+    numbers = _DIGITS.findall(lowered)
+
+    # A spelled month ("JUN 2026") only needs a year-shaped number beside it.
+    if any(word in MONTH_WORDS for word in _WORDS.findall(lowered)):
+        return any(len(n) in (2, 4) for n in numbers)
+
+    # Otherwise one number has to read as the month and another as the year.
+    for i, month in enumerate(numbers):
+        if len(month) > 2 or not 1 <= int(month) <= 12:
+            continue
+        if any(len(year) in (2, 4) for j, year in enumerate(numbers) if j != i):
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -127,8 +194,39 @@ def _net_quantity_not_prohibited_unit(e: ExtractedData) -> bool:
     return _canonical_unit(nq.unit) not in NON_STANDARD_UNITS
 
 
+def _mfg_date_states_month_and_year(e: ExtractedData) -> bool:
+    # Rule 6(1)(d) — the declaration must give the month AND the year, not just
+    # one of them. Guarded: when the date is absent altogether the presence rule
+    # already covers it, so this stays silent rather than reporting one defect
+    # as two offences.
+    if not _text(e.mfg_or_pack_date):
+        return True
+    return _states_month_and_year(e.mfg_or_pack_date)
+
+
+def _country_of_origin_for_imports(e: ExtractedData) -> bool:
+    # Rule 6(1)(aa) — an imported package must name its country of origin,
+    # manufacture or assembly. Guarded on the pack actually presenting as
+    # imported: a domestic pack has nothing to declare here, and `None` means
+    # the photographs could not tell, which is not evidence of a breach.
+    if not getattr(e, "import_declared", None):
+        return True
+    return _text(getattr(e, "country_of_origin", None))
+
+
+def _declarations_in_hindi_or_english(e: ExtractedData) -> bool:
+    # Rule 9(4) — "The particulars of the declarations ... shall either be in
+    # Hindi in Devnagri script or in English". Any additional language is
+    # expressly permitted by the proviso, so only declarations printed in
+    # NEITHER are a breach. An unreported language leaves the rule silent.
+    lang = _canonical_language(getattr(e, "declaration_language", None))
+    if lang is None:
+        return True
+    return lang not in NON_COMPLIANT_LANGUAGES
+
+
 # ---------------------------------------------------------------------------
-# The 8 rules — deterministic Legal Metrology checks.
+# The 11 rules — deterministic Legal Metrology checks.
 # ---------------------------------------------------------------------------
 
 RuleCheck = Callable[[ExtractedData], bool]
@@ -139,6 +237,12 @@ RULES: List[dict] = [
         "rule_ref": "Rule 6(1)(a)",
         "issue": "Name and address of manufacturer/packer/importer missing",
         "check": _has_manufacturer,
+    },
+    {
+        "field": "country_of_origin",
+        "rule_ref": "Rule 6(1)(aa)",
+        "issue": "Imported package does not declare its country of origin, manufacture or assembly",
+        "check": _country_of_origin_for_imports,
     },
     {
         "field": "product_name",
@@ -157,6 +261,12 @@ RULES: List[dict] = [
         "rule_ref": "Rule 6(1)(d)",
         "issue": "Month and year of manufacture/packing/import not declared",
         "check": _has_mfg_date,
+    },
+    {
+        "field": "mfg_or_pack_date",
+        "rule_ref": "Rule 6(1)(d)",
+        "issue": "Date of manufacture/packing does not state both a month and a year",
+        "check": _mfg_date_states_month_and_year,
     },
     {
         "field": "mrp",
@@ -182,18 +292,33 @@ RULES: List[dict] = [
         "issue": "Net quantity uses a non-standard unit (e.g. dozen/score/gross)",
         "check": _net_quantity_not_prohibited_unit,
     },
+    {
+        "field": "declaration_language",
+        "rule_ref": "Rule 9(4)",
+        "issue": "Declarations are not printed in Hindi (Devnagri script) or in English",
+        "check": _declarations_in_hindi_or_english,
+    },
 ]
 
 
 # ---------------------------------------------------------------------------
-# Per-category rules (future hook).
+# Per-category rules (hook).
 #
-# Every product category currently runs the EXACT SAME 8 Legal Metrology rules
-# above. This mapping is intentionally EMPTY today — it exists only so real
-# category-specific Legal Metrology rules can be added later without touching
-# check_compliance_rules(). To add rules for a category later, map its name to a
-# list of extra rule dicts (same shape as RULES). Do NOT add FSSAI or other
-# non-Legal-Metrology rules here.
+# Every product category runs the EXACT SAME 11 Legal Metrology rules above.
+# This mapping is EMPTY, and now deliberately so rather than merely pending.
+#
+# WHY IT IS EMPTY (checked, so nobody re-treads this): the obvious candidate was
+# Rule 5 read with the Second Schedule, which required certain commodities — tea,
+# biscuits, baby food, cement, paint, aerated drinks — to be packed only in
+# prescribed standard quantities. That would have been a genuine per-category
+# rule, and it is checkable from a photograph. But Rule 5 and the Second Schedule
+# were OMITTED by amendment: a commodity may now lawfully be packed in any size.
+# Checking a net quantity against a prescribed pack size would therefore raise a
+# violation citing a provision that no longer exists.
+#
+# The hook stays, because a real per-category Legal Metrology rule can still be
+# added by mapping a category name to a list of extra rule dicts (same shape as
+# RULES). Do NOT add FSSAI, nutrition or pricing rules here.
 # ---------------------------------------------------------------------------
 CATEGORY_RULES: Dict[str, List[dict]] = {}
 
@@ -203,10 +328,11 @@ def check_compliance_rules(
     category: Optional[str] = None,
 ) -> Tuple[List[Violation], str]:
     """
-    Evaluate the 8 Legal Metrology rules against extracted label data.
+    Evaluate the 11 Legal Metrology rules against extracted label data.
 
     `category` is accepted so future per-category rules can be looked up, but
-    today every category runs the same 8 base checks (CATEGORY_RULES is empty).
+    today every category runs the same 11 base checks (CATEGORY_RULES is empty
+    by design — see the note above it).
 
     Returns:
         Tuple[List[Violation], str]: (violations_list, status_string)

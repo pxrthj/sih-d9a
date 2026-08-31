@@ -116,6 +116,13 @@ spacing:
   touch-target: 44px
 ---
 
+> **Where the tokens actually live.** The frontend is Tailwind v4 + shadcn/ui, and
+> `frontend/src/index.css` is the single source of truth for colour, radius and type. This file
+> is the original design brief: the navy/compliance palette below still holds, but the shape and
+> elevation guidance predates the shadcn migration — the app uses shadcn's smaller radii
+> (`--radius: 0.625rem`) and its subtle single-layer shadows, not the 24px containers described
+> here. Read it for intent; read `index.css` for values.
+
 ## Brand & Style
 
 The design system is engineered for **PackCheck AI**, an enterprise-grade platform for Legal Metrology compliance. The brand personality is **authoritative, precise, and transparent**, mirroring the reliability required by government regulatory bodies while leveraging the efficiency of artificial intelligence.

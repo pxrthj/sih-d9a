@@ -85,7 +85,7 @@ export interface TopBreach {
 /**
  * Finds the single most-breached rule across the given scans.
  *
- * Each of the eight rules can fire at most once per scan, so a rule's count is
+ * Each rule can fire at most once per scan, so a rule's count is
  * also the number of packages that breached it. The share is measured against
  * scans that had any violation at all — compliant packages would only dilute it.
  *

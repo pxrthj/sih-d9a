@@ -91,6 +91,30 @@ class ExtractedData(BaseModel):
         default=None,
         description="Contact details (name/designation, address, telephone/email) for consumer complaints"
     )
+    country_of_origin: Optional[str] = Field(
+        default=None,
+        description=(
+            "Country of origin, manufacture or assembly, exactly as printed. Only imported "
+            "packages carry this. Null if not present."
+        ),
+    )
+    import_declared: Optional[bool] = Field(
+        default=None,
+        description=(
+            "OBSERVATION, not a verdict. True when the package presents itself as imported — "
+            "it says 'Imported by', 'Imported & Marketed by', or gives a foreign manufacturer "
+            "address. False when it reads as manufactured or packed in India. Null if the "
+            "photographs cannot tell."
+        ),
+    )
+    declaration_language: Optional[str] = Field(
+        default=None,
+        description=(
+            "Script the mandatory declarations are printed in: 'english', 'hindi', 'both', or "
+            "'other' when they appear ONLY in a language that is neither Hindi nor English. "
+            "Null if it cannot be determined."
+        ),
+    )
     declarations_present: List[str] = Field(
         default_factory=list,
         description="List of all declaration types identified on the package"

@@ -30,6 +30,12 @@ export interface ExtractedData {
   use_by_date: string | null
   lot_batch_number: string | null
   consumer_care: string | null
+  /** Country of origin/manufacture/assembly — imported packs only. */
+  country_of_origin: string | null
+  /** Whether the pack presents itself as imported. An observation, not a verdict. */
+  import_declared: boolean | null
+  /** 'english' | 'hindi' | 'both' | 'other'; null when it could not be determined. */
+  declaration_language: string | null
   declarations_present: string[]
   declaration_block: DeclarationBlock | null
 }

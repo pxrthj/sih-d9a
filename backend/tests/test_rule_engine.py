@@ -12,7 +12,7 @@ from app.schemas.scan import ExtractedData, MRP, NetQuantity
 
 
 def compliant(**overrides) -> ExtractedData:
-    """A package that satisfies all eight rules, before any override."""
+    """A package that satisfies every rule, before any override."""
     data = {
         "product_name": "Potato Chips",
         "manufacturer_packer_importer": "Shubh Foods Pvt Ltd, Plot 14, MIDC Bhosari, Pune 411026",
@@ -167,3 +167,92 @@ def test_repeated_evaluation_is_identical():
     first = [(v.field, v.issue, v.rule_ref) for v in check_compliance_rules(label)[0]]
     for _ in range(5):
         assert [(v.field, v.issue, v.rule_ref) for v in check_compliance_rules(label)[0]] == first
+
+
+# --------------------------------------------------------------------------
+# Rule 6(1)(aa): country of origin, but only on packs that say they're imported
+# --------------------------------------------------------------------------
+
+def test_imported_pack_naming_its_origin_is_compliant():
+    found = refs(compliant(import_declared=True, country_of_origin="Made in Vietnam"))
+    assert "Rule 6(1)(aa)" not in found
+
+
+def test_imported_pack_without_an_origin_breaches_6_1_aa():
+    violations, status = check_compliance_rules(compliant(import_declared=True))
+    assert [v.rule_ref for v in violations] == ["Rule 6(1)(aa)"]
+    assert violations[0].field == "country_of_origin"
+    assert status == "flagged"
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_a_blank_origin_on_an_imported_pack_is_not_a_declaration(blank):
+    assert "Rule 6(1)(aa)" in refs(compliant(import_declared=True, country_of_origin=blank))
+
+
+def test_a_domestic_pack_has_no_origin_to_declare():
+    assert "Rule 6(1)(aa)" not in refs(compliant(import_declared=False))
+
+
+def test_an_unreadable_import_status_is_not_a_breach():
+    """None means the photographs could not tell — that is not evidence of a breach."""
+    assert "Rule 6(1)(aa)" not in refs(compliant(import_declared=None))
+
+
+# --------------------------------------------------------------------------
+# Rule 6(1)(d): the date must state a month AND a year
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "printed",
+    ["06/2026", "06-2026", "2026-06", "JUN 2026", "June 2026", "JUN26",
+     "12/06/2026", "MFG 06 2026", "Packed 03.24"],
+)
+def test_dates_carrying_a_month_and_a_year_pass(printed):
+    assert "Rule 6(1)(d)" not in refs(compliant(mfg_or_pack_date=printed))
+
+
+@pytest.mark.parametrize("printed", ["2026", "24", "06", "JUNE", "Best before 9 months from packing"])
+def test_a_date_missing_its_month_or_year_breaches_6_1_d(printed):
+    violations, status = check_compliance_rules(compliant(mfg_or_pack_date=printed))
+    assert [v.rule_ref for v in violations] == ["Rule 6(1)(d)"]
+    assert status == "flagged"
+
+
+def test_a_missing_date_is_one_offence_not_two():
+    """The presence rule and the format rule share a citation; only one may fire."""
+    violations, _ = check_compliance_rules(compliant(mfg_or_pack_date=None))
+    cited = [v.rule_ref for v in violations]
+    assert cited.count("Rule 6(1)(d)") == 1
+    assert "month and year" not in violations[0].issue, "a missing date is not a formatting defect"
+
+
+# --------------------------------------------------------------------------
+# Rule 9(4): declarations in Hindi (Devnagri) or English
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "reported",
+    ["english", "English", " HINDI ", "hindi", "both", "en", "hi", "devanagari", "bilingual"],
+)
+def test_hindi_or_english_declarations_pass_9_4(reported):
+    assert "Rule 9(4)" not in refs(compliant(declaration_language=reported))
+
+
+@pytest.mark.parametrize("reported", ["other", "Other", "neither", "none"])
+def test_declarations_in_neither_language_breach_9_4(reported):
+    violations, status = check_compliance_rules(compliant(declaration_language=reported))
+    assert [v.rule_ref for v in violations] == ["Rule 9(4)"]
+    assert violations[0].field == "declaration_language"
+    assert status == "flagged"
+
+
+@pytest.mark.parametrize("reported", [None, "", "   "])
+def test_an_unreported_language_is_not_a_breach(reported):
+    """A photograph that cannot settle the question is not evidence of a breach."""
+    assert "Rule 9(4)" not in refs(compliant(declaration_language=reported))
+
+
+def test_an_additional_language_is_expressly_permitted():
+    """The proviso to Rule 9(4) allows any other language IN ADDITION to Hindi/English."""
+    assert "Rule 9(4)" not in refs(compliant(declaration_language="both"))

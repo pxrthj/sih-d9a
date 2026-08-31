@@ -1,70 +1,63 @@
 import { useState } from 'react'
-import { useAuth } from '../auth/AuthContext'
-import { Avatar, Spinner } from '../components/ui'
-import { LogoutIcon, ShieldIcon } from '../components/Icons'
+import { LogOut, Shield } from 'lucide-react'
+import { useAuth } from '@/auth/AuthContext'
+import { AppAvatar } from '@/components/app-avatar'
+import { Field } from '@/components/ScanResult'
+import { PageHeader, Spinner } from '@/components/page-header'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 
 export default function Profile() {
   const { googleName, googleEmail, avatarUrl, profile, isAdmin, signOut } = useAuth()
   const [loading, setLoading] = useState(false)
 
   const roleLabel =
-    profile?.role === 'admin' ? 'Administrator' : profile?.role === 'officer' ? 'Inspection Officer' : '—'
+    profile?.role === 'admin'
+      ? 'Administrator'
+      : profile?.role === 'officer'
+        ? 'Inspection Officer'
+        : '—'
 
   return (
-    <div className="stack">
-      <h1 className="headline">Profile</h1>
+    <div className="space-y-5">
+      <PageHeader title="Profile" />
 
-      {/* Identity card */}
-      <div className="card" style={{ textAlign: 'center', paddingTop: 26, paddingBottom: 26 }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-          <Avatar src={avatarUrl} name={googleName} size={84} />
-        </div>
-        <div style={{ fontSize: 20, fontWeight: 700 }}>{googleName}</div>
-        <div className="muted" style={{ fontSize: 14, marginTop: 3 }}>
-          {googleEmail}
-        </div>
-        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center' }}>
-          <span className={`pill ${isAdmin ? 'pill--warning' : 'pill--success'}`}>
-            <ShieldIcon size={13} /> {roleLabel}
-          </span>
-        </div>
-      </div>
+      <Card className="items-center px-5 py-8 text-center">
+        <AppAvatar src={avatarUrl} name={googleName} className="size-20" />
+        <div className="mt-4 text-lg font-semibold">{googleName}</div>
+        <div className="text-muted-foreground text-sm">{googleEmail}</div>
+        <Badge variant={isAdmin ? 'warning' : 'secondary'} className="mt-3">
+          <Shield />
+          {roleLabel}
+        </Badge>
+      </Card>
 
-      {/* Details */}
-      <div className="card">
-        <div className="field">
-          <div className="field__label">Full name</div>
-          <div className="field__value">{profile?.full_name || googleName}</div>
-        </div>
-        <div className="field">
-          <div className="field__label">Email</div>
-          <div className="field__value">{googleEmail || '—'}</div>
-        </div>
-        <div className="field">
-          <div className="field__label">Role</div>
-          <div className="field__value">{roleLabel}</div>
-        </div>
-        <div className="field">
-          <div className="field__label">Account status</div>
-          <div className="field__value" style={{ textTransform: 'capitalize' }}>
-            {profile?.status || '—'}
-          </div>
-        </div>
-      </div>
+      <Card>
+        <dl>
+          <Field label="Full name" value={profile?.full_name || googleName} />
+          <Field label="Email" value={googleEmail || '—'} />
+          <Field label="Role" value={roleLabel} />
+          <Field label="Account status">
+            <span className="capitalize">{profile?.status || '—'}</span>
+          </Field>
+        </dl>
+      </Card>
 
-      <button
-        className="btn btn--danger btn--block"
+      <Button
+        variant="outline"
+        className="text-destructive hover:text-destructive w-full"
         disabled={loading}
         onClick={async () => {
           setLoading(true)
           await signOut()
         }}
       >
-        {loading ? <Spinner /> : <LogoutIcon size={18} />}
+        {loading ? <Spinner /> : <LogOut />}
         Sign out
-      </button>
+      </Button>
 
-      <p className="muted" style={{ fontSize: 11.5, textAlign: 'center', lineHeight: 1.5 }}>
+      <p className="text-muted-foreground text-center text-xs">
         ParakhMitra · Legal Metrology Compliance
       </p>
     </div>

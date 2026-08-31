@@ -1,52 +1,61 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
-import { HomeIcon, HistoryIcon, UsersIcon, ProfileIcon, MonitorIcon } from './Icons'
-import { Avatar } from './ui'
-import logo from '../assets/logo.png'
+import { ClipboardList, House, Monitor, User, Users } from 'lucide-react'
+import { useAuth } from '@/auth/AuthContext'
+import { AppAvatar } from '@/components/app-avatar'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
+import logo from '@/assets/logo.png'
 
-// The admin console is a desktop-only surface. Officers keep the mobile app
+// The admin console is a desktop surface. Officers keep the mobile app
 // (Layout.tsx) because they scan with a phone; admins supervise from a wide
-// screen with room for the analytics that will grow here.
+// screen with room for the analytics that live here.
 const NAV = [
-  { to: '/', end: true, label: 'Dashboard', Icon: HomeIcon },
-  { to: '/history', end: false, label: 'Inspections', Icon: HistoryIcon },
-  { to: '/users', end: false, label: 'Users', Icon: UsersIcon },
-  { to: '/profile', end: false, label: 'Profile', Icon: ProfileIcon },
+  { to: '/', end: true, label: 'Dashboard', icon: House },
+  { to: '/history', end: false, label: 'Inspections', icon: ClipboardList },
+  { to: '/users', end: false, label: 'Users', icon: Users },
+  { to: '/profile', end: false, label: 'Profile', icon: User },
 ] as const
 
 function Sidebar() {
   const { googleName, avatarUrl } = useAuth()
+
   return (
-    <aside className="admin-sidebar">
-      <div className="admin-sidebar__brand">
-        <img className="admin-sidebar__logo" src={logo} alt="" />
-        <div>
-          <div className="admin-sidebar__title">ParakhMitra</div>
-          <div className="admin-sidebar__subtitle">Legal Metrology Compliance</div>
+    <aside className="bg-card fixed inset-y-0 left-0 flex w-60 flex-col border-r">
+      <div className="flex items-center gap-3 px-5 py-5">
+        <img src={logo} alt="" className="size-8 rounded" />
+        <div className="min-w-0">
+          <div className="text-sm leading-tight font-semibold">ParakhMitra</div>
+          <div className="text-muted-foreground truncate text-xs">Legal Metrology</div>
         </div>
       </div>
 
-      <nav className="admin-nav">
-        {NAV.map(({ to, end, label, Icon }) => (
+      <nav className="flex flex-1 flex-col gap-0.5 px-3">
+        {NAV.map(({ to, end, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
-            className={({ isActive }) => `admin-navitem ${isActive ? 'admin-navitem--active' : ''}`}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-secondary text-secondary-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              )
+            }
           >
-            <Icon size={19} />
+            <Icon className="size-4" />
             {label}
           </NavLink>
         ))}
       </nav>
 
-      <div className="admin-sidebar__footer">
-        <span className="admin-sidebar__scope">Admin</span>
-        <div className="admin-sidebar__user">
-          <Avatar src={avatarUrl} name={googleName} size={36} />
-          <div className="admin-sidebar__usermeta">
-            <div className="admin-sidebar__username">{googleName}</div>
-            <div className="admin-sidebar__userrole">Administrator</div>
+      <div className="border-t p-3">
+        <div className="flex items-center gap-3 px-2 py-1">
+          <AppAvatar src={avatarUrl} name={googleName} className="size-8" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium">{googleName}</div>
+            <div className="text-muted-foreground text-xs">Administrator</div>
           </div>
         </div>
       </div>
@@ -57,28 +66,31 @@ function Sidebar() {
 export default function AdminLayout() {
   return (
     <>
-      {/* Below the desktop breakpoint the console is hidden (CSS) and this gate
-          takes its place — the admin views are built for width, not a phone. */}
-      <div className="admin-gate">
-        <div className="admin-gate__card">
-          <div className="admin-gate__icon">
-            <MonitorIcon size={40} />
+      {/* Below the desktop breakpoint the console is replaced by this gate —
+          the admin views are built for width, not for a phone. */}
+      <div className="grid min-h-screen place-items-center px-6 lg:hidden">
+        <div className="max-w-sm text-center">
+          <div className="bg-muted text-muted-foreground mx-auto grid size-12 place-items-center rounded-full">
+            <Monitor className="size-6" />
           </div>
-          <h1 className="admin-gate__title">Open on a desktop</h1>
-          <p className="admin-gate__text">
-            The ParakhMitra admin console is built for a larger screen. Please open it on a desktop
-            or widen your browser window to continue.
+          <h1 className="mt-4 text-lg font-semibold">Open on a desktop</h1>
+          <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+            The ParakhMitra admin console is built for a larger screen. Open it on a desktop, or
+            widen this window to continue.
           </p>
         </div>
       </div>
 
-      <div className="admin-shell">
+      <div className="hidden min-h-screen lg:block">
         <Sidebar />
-        <main className="admin-main">
-          <div className="admin-content">
+        <div className="pl-60">
+          <header className="bg-card/80 sticky top-0 z-20 flex h-14 items-center justify-end border-b px-8 backdrop-blur">
+            <Badge variant="secondary">Admin</Badge>
+          </header>
+          <main className="mx-auto max-w-6xl px-8 py-8">
             <Outlet />
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
     </>
   )

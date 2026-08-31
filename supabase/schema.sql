@@ -174,3 +174,69 @@ create policy evidence_upload_authenticated on storage.objects
 -- notice. The bucket therefore stays private with upload as its only client
 -- permission.
 drop policy if exists evidence_read_own_or_admin on storage.objects;
+
+-- ---------------------------------------------------------------------------
+-- 7. repeat_offenders() — which packers do we keep finding in breach?
+--
+-- A single flagged package is a defect; the same packer flagged across many
+-- inspections is a pattern, and that is what makes this an enforcement tool
+-- rather than a scanning tool.
+--
+-- WHY THIS IS A DATABASE FUNCTION AND NOT BROWSER CODE
+-- The grouping has to run over EVERY inspection, not over the page the client
+-- happens to be holding, and the aggregate must never widen what a caller can
+-- see. SECURITY INVOKER gives us both: the function runs as the caller, so the
+-- select policy on `scans` above still decides which rows it can count. An
+-- officer therefore gets repeat offenders across their own inspections; an
+-- admin gets them across everyone's. This grants no new visibility.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.repeat_offenders(min_flagged integer default 2)
+returns table (
+  manufacturer  text,
+  scans_total   bigint,
+  scans_flagged bigint,
+  last_seen     timestamptz
+)
+language sql
+stable
+security invoker           -- deliberate: RLS on `scans` still applies. Do not change.
+set search_path = public
+as $$
+  with normalised as (
+    select
+      -- Group on the company name only: the part before the first comma of the
+      -- declared "name and complete address". Addresses are printed far too
+      -- inconsistently across packs to group on, and including one would split
+      -- a single packer into a dozen near-identical rows.
+      lower(regexp_replace(
+        btrim(split_part(extracted ->> 'manufacturer_packer_importer', ',', 1)),
+        '\s+', ' ', 'g'
+      )) as group_key,
+      btrim(split_part(extracted ->> 'manufacturer_packer_importer', ',', 1)) as label,
+      status,
+      created_at
+    from public.scans
+    where btrim(coalesce(extracted ->> 'manufacturer_packer_importer', '')) <> ''
+  )
+  select
+    -- Show the spelling from the most recent inspection, so the name on screen
+    -- matches the newest evidence photo an officer might open next to it.
+    (array_agg(label order by created_at desc))[1]        as manufacturer,
+    count(*)                                              as scans_total,
+    count(*) filter (where lower(status) <> 'compliant')  as scans_flagged,
+    max(created_at)                                       as last_seen
+  from normalised
+  group by group_key
+  having count(*) filter (where lower(status) <> 'compliant') >= min_flagged
+  order by
+    count(*) filter (where lower(status) <> 'compliant') desc,
+    max(created_at) desc;
+$$;
+
+comment on function public.repeat_offenders(integer) is
+  'Packers with at least min_flagged non-compliant inspections, grouped by declared '
+  'company name. SECURITY INVOKER: obeys row level security, so the caller sees only '
+  'the inspections they were already entitled to.';
+
+grant execute on function public.repeat_offenders(integer) to authenticated;

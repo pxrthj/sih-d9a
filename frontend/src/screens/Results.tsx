@@ -1,8 +1,15 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import type { CaptureCoords, ScanResponse } from '../lib/types'
-import { VerdictBanner, ExtractedFields, ViolationList, AdvisoryList } from '../components/ScanResult'
-import { HomeIcon, MapPinIcon, ScanIcon } from '../components/Icons'
-import { formatLocation } from '../lib/format'
+import { House, MapPin, ScanLine } from 'lucide-react'
+import type { CaptureCoords, ScanResponse } from '@/lib/types'
+import {
+  AdvisoryList,
+  ExtractedFields,
+  VerdictBanner,
+  ViolationList,
+} from '@/components/ScanResult'
+import { SectionLabel } from '@/components/page-header'
+import { Button } from '@/components/ui/button'
+import { formatLocation } from '@/lib/format'
 
 export default function Results() {
   const location = useLocation()
@@ -10,10 +17,8 @@ export default function Results() {
   const state = location.state as { result?: ScanResponse; coords?: CaptureCoords | null } | null
   const result = state?.result
 
-  // Direct navigation / refresh loses the in-memory result — send back to scan.
-  if (!result) {
-    return <Navigate to="/scan" replace />
-  }
+  // Direct navigation or a refresh loses the in-memory result — send back to scan.
+  if (!result) return <Navigate to="/scan" replace />
 
   const violations = result.violations ?? []
   const loc = state?.coords
@@ -25,10 +30,8 @@ export default function Results() {
     : null
 
   return (
-    <div className="stack">
-      <div className="muted" style={{ fontSize: 12.5, fontWeight: 600, letterSpacing: '0.04em' }}>
-        SCAN COMPLETE · READ-ONLY RECORD
-      </div>
+    <div className="space-y-5">
+      <SectionLabel>Scan complete · read-only record</SectionLabel>
 
       <VerdictBanner status={result.status} violationCount={violations.length} />
 
@@ -37,38 +40,39 @@ export default function Results() {
           href={loc.mapsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="muted"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, textDecoration: 'none' }}
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs transition-colors"
         >
-          <MapPinIcon size={15} />
+          <MapPin className="size-3.5" />
           Scanned at {loc.text}
         </a>
       )}
 
-      <div>
-        <div className="section-label">Violations</div>
+      <section className="space-y-2">
+        <SectionLabel>Violations</SectionLabel>
         <ViolationList violations={violations} />
-      </div>
+      </section>
 
       <AdvisoryList advisories={result.advisories} />
 
-      <div>
-        <div className="section-label">Extracted declarations</div>
+      <section className="space-y-2">
+        <SectionLabel>Extracted declarations</SectionLabel>
         <ExtractedFields extracted={result.extracted} />
+      </section>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Button variant="outline" onClick={() => navigate('/')}>
+          <House />
+          Home
+        </Button>
+        <Button onClick={() => navigate('/scan')}>
+          <ScanLine />
+          New scan
+        </Button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <button className="btn btn--ghost" onClick={() => navigate('/')}>
-          <HomeIcon size={18} /> Home
-        </button>
-        <button className="btn btn--primary" onClick={() => navigate('/scan')}>
-          <ScanIcon size={18} /> New Scan
-        </button>
-      </div>
-
-      <p className="muted" style={{ fontSize: 12, textAlign: 'center', lineHeight: 1.5 }}>
-        This inspection record has been saved and is immutable. Extracted data and the compliance
-        verdict cannot be edited or deleted.
+      <p className="text-muted-foreground text-center text-xs leading-relaxed">
+        This inspection record has been saved and is immutable. The extracted data and the
+        compliance verdict cannot be edited or deleted.
       </p>
     </div>
   )
