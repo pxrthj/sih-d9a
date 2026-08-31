@@ -70,15 +70,7 @@ cwd `backend`, port 8000).
     `Asia/Kolkata` before formatting. Formatting without converting silently prints a time 5.5
     hours out — and, before 05:30 IST, the wrong *date* on a document whose compliance period is
     counted from it.
-11. **Rule 5 and the Second Schedule are repealed — do not implement them.** The obvious
-    per-category rule (certain commodities may only be packed in prescribed standard sizes) no
-    longer exists: Rule 5 and the Second Schedule were omitted by amendment, and a commodity may
-    now be packed in any size. `CATEGORY_RULES` stays empty for that reason, not because nobody
-    got to it. Checking net quantity against a prescribed pack size would cite dead law.
-12. **`repeat_offenders()` must stay `security invoker`.** It aggregates across `scans`, so the
-    only thing stopping it becoming a data leak is that RLS still applies to the caller. Making it
-    `security definer` would hand every officer everyone else's inspections.
-13. **The notice reference must stay deterministic.** `_notice_ref()` derives `PM/<year>/<12 hex>`
+11. **The notice reference must stay deterministic.** `_notice_ref()` derives `PM/<year>/<12 hex>`
     from the record's id and creation date, so regenerating a notice a year later produces the
     same reference. Don't make it depend on the current time or a counter.
 
@@ -89,7 +81,7 @@ cwd `backend`, port 8000).
 ```
 backend/app/
   api/scans.py            all 5 endpoints; _authorise_scan_access() is the shared owner-or-admin gate
-  rules/engine.py         the 11 rules + build_advisories(); pure functions, no I/O
+  rules/engine.py         the 8 rules + build_advisories(); pure functions, no I/O
   schemas/scan.py         Pydantic models — these ARE the Gemini response schema, not just validation
   services/gemini_service.py   one call, all images, structured output, media_resolution=HIGH
   services/supabase_service.py storage + db; create_signed_url() and the column-degrading insert
@@ -99,12 +91,9 @@ backend/tests/            pytest; start here when changing the engine
 backend/experiments/      OCR baseline, kept as evidence. Not imported by the app.
 frontend/src/
   screens/                one file per screen; Verify.tsx is the only public one
-  components/ui/          shadcn/ui primitives — generated sources, edit rather than wrap
-  components/             app-level shared pieces (status-badge, stat-card, inspection-map, …)
-  hooks/ lib/             lib/api.ts is the only fetch layer; lib/utils.ts is cn()
-  index.css               Tailwind v4 + the design tokens; there is no other stylesheet
+  components/ hooks/ lib/ lib/api.ts is the only fetch layer
   assets/logo.png         app logo; public/favicon.png is the tab icon
-supabase/schema.sql       tables, trigger, every RLS policy, repeat_offenders(). Idempotent.
+supabase/schema.sql       tables, trigger, every RLS policy. Idempotent — safe to re-run.
 ```
 
 **The five endpoints:** `POST /api/scans` (the only writer), `GET /{id}/evidence` (signed photo
@@ -138,12 +127,6 @@ These are things the code doesn't tell you and that have cost time before:
   including `/health`). If the deployed app 404s on everything, check the service exists before
   debugging code.
 - **Free-tier Render sleeps** after ~15 min and cold-starts in ~50s. Hit `/health` before a demo.
-- **Three extraction fields exist only to feed a rule**: `country_of_origin` and
-  `import_declared` (Rule 6(1)(aa), guarded on the pack presenting as imported) and
-  `declaration_language` (Rule 9(4) — Hindi in Devnagri or English, and the proviso expressly
-  permits any *additional* language, so only a positive report of `other` is a breach). All three
-  live in the `extracted` jsonb, so they need no migration. An unreported value never fires a
-  rule: a photograph that cannot settle the question is not evidence of a breach.
 - **`GEMINI_MODEL` defaults to `gemini-3.5-flash`.** Flash-Lite is cheaper but loses the small
   ink-jet MRP/batch blocks, which is the whole point of the extraction. Don't downgrade it to
   save money without re-testing that case.
@@ -159,10 +142,10 @@ These are things the code doesn't tell you and that have cost time before:
 - Rate limiting is an in-process dict: resets on restart, not shared across instances. A spend
   guard, not a security control. The public verify route is limited per IP, same caveat.
 - Only the backend has tests; the frontend has none.
-- Eleven rules, not the whole of the 2011 Rules — the photograph-verifiable subset.
+- Eight rules, not the whole of the 2011 Rules — the photograph-verifiable subset.
 - The admin dashboard's most-breached-rule tile (`topBreach()` in `lib/format.ts`) is computed in
   the browser over every row the admin query returns. Fine at demo scale; the production answer is
-  a grouped query in Postgres — `repeat_offenders()` in `schema.sql` is the pattern to copy.
+  a grouped query in Postgres.
 - The notice is tamper-*evident* (QR verification), not tamper-proof. Digitally signing the PDF —
   PAdES, e.g. via pyHanko — is the production answer, and key custody is the real obstacle.
 
@@ -175,14 +158,6 @@ These are things the code doesn't tell you and that have cost time before:
 - Errors shown to an officer say what went wrong and what to do about it.
 - Python: type hints on public functions, `logger` not `print`.
 - TypeScript: `strict` is on and `tsc -b` must stay clean. No `any`.
-- **The frontend is Tailwind v4 + shadcn/ui.** `src/index.css` holds the tokens (shadcn's
-  contract — background/foreground, card, muted, border — carrying the navy palette from
-  DESIGN.md) and nothing else; there are no hand-written class names left. Components in
-  `components/ui/` are shadcn sources: edit them in place, don't wrap them. The app is
-  deliberately light-only — no `.dark` block, because the compliance colours are chosen for
-  contrast on white and officers work outdoors at full brightness.
-- `lint` has two long-standing `react-hooks/set-state-in-effect` errors in NewScan/ScanDetail.
-  They predate the Tailwind migration; `tsc -b` is the gate that must stay clean.
 - Don't add dependencies casually — `xhtml2pdf` was chosen over WeasyPrint specifically because
   it is pure Python and needs no system libraries on Windows or Render's free tier. `qrcode` was
   added on the same basis.

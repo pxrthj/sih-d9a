@@ -143,7 +143,7 @@ cd backend && venv/Scripts/pip install -r requirements-dev.txt && venv/Scripts/p
 
 Stated plainly, because a compliance tool that overclaims is worse than none:
 
-- **Eleven rules, not the whole of the 2011 Rules.** These are the mandatory declarations that can
+- **Eight rules, not the whole of the 2011 Rules.** These are the mandatory declarations that can
   be verified from a photograph with certainty. Requirements such as minimum letter height need a
   calibrated reference in frame, so they are raised as advisories rather than adjudicated.
 - **No published accuracy figure.** Extraction has not been measured against a labelled set. The

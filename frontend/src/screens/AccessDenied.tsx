@@ -1,35 +1,51 @@
 import { useState } from 'react'
-import { ShieldAlert } from 'lucide-react'
-import { useAuth } from '@/auth/AuthContext'
-import { Spinner } from '@/components/page-header'
-import { Button } from '@/components/ui/button'
+import { useAuth } from '../auth/AuthContext'
+import { AlertIcon } from '../components/Icons'
+import { Spinner } from '../components/ui'
 
 export default function AccessDenied() {
   const { deniedReason, googleEmail, signOut } = useAuth()
   const [loading, setLoading] = useState(false)
 
   return (
-    <div className="grid min-h-screen place-items-center px-6">
-      <div className="max-w-sm text-center">
-        <div className="bg-destructive-muted text-destructive mx-auto grid size-14 place-items-center rounded-full">
-          <ShieldAlert className="size-7" />
+    <div className="app-shell">
+      <div className="center-screen" style={{ flexDirection: 'column', textAlign: 'center', gap: 4 }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: '50%',
+            background: 'var(--error-bg)',
+            color: 'var(--error)',
+            display: 'grid',
+            placeItems: 'center',
+            marginBottom: 12,
+          }}
+        >
+          <AlertIcon size={32} />
         </div>
-        <h1 className="mt-5 text-xl font-semibold tracking-tight">Access not authorised</h1>
-        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">{deniedReason}</p>
+        <h1 className="headline" style={{ fontSize: 22 }}>
+          Access not authorised
+        </h1>
+        <p className="muted" style={{ fontSize: 14.5, lineHeight: 1.55, maxWidth: 320, marginTop: 6 }}>
+          {deniedReason}
+        </p>
         {googleEmail && (
-          <p className="text-muted-foreground mt-3 text-xs">Signed in as {googleEmail}</p>
+          <p className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+            Signed in as {googleEmail}
+          </p>
         )}
-        <Button
-          className="mt-6 w-full"
+        <button
+          className="btn btn--primary btn--block"
+          style={{ marginTop: 24, maxWidth: 300 }}
           disabled={loading}
           onClick={async () => {
             setLoading(true)
             await signOut()
           }}
         >
-          {loading && <Spinner />}
-          Sign out
-        </Button>
+          {loading ? <Spinner /> : 'Sign out'}
+        </button>
       </div>
     </div>
   )

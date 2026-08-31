@@ -1,10 +1,7 @@
 import { useState } from 'react'
-import { TriangleAlert } from 'lucide-react'
-import { useAuth } from '@/auth/AuthContext'
-import { Spinner } from '@/components/page-header'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import logo from '@/assets/logo.png'
+import { useAuth } from '../auth/AuthContext'
+import { Banner, Spinner } from '../components/ui'
+import logo from '../assets/logo.png'
 
 function GoogleGlyph() {
   return (
@@ -47,36 +44,50 @@ export default function Login() {
   }
 
   return (
-    <div className="bg-primary text-primary-foreground flex min-h-screen flex-col">
-      <div className="app-column flex flex-1 flex-col px-7 py-12">
-        <div className="flex flex-1 flex-col justify-center">
-          {/* Decorative — the wordmark below already names the app. */}
-          <img src={logo} alt="" className="size-20 rounded-xl" />
-          <h1 className="mt-6 text-3xl font-semibold tracking-tight">ParakhMitra</h1>
-          <p className="mt-3 max-w-xs text-sm leading-relaxed opacity-80">
-            Field companion for Legal Metrology inspection officers — scan a package, get an instant
-            compliance verdict backed by an immutable audit record.
+    <div className="app-shell" style={{ boxShadow: '0 0 40px rgba(0,0,0,0.08)' }}>
+      <div
+        style={{
+          flex: 1,
+          background: 'linear-gradient(160deg, #002045 0%, #1a365d 55%, #1960a3 100%)',
+          color: '#fff',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '48px 28px',
+        }}
+      >
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          {/* Decorative: the wordmark below already names the app. */}
+          <img
+            src={logo}
+            alt=""
+            style={{
+              width: 96,
+              height: 96,
+              marginBottom: 24,
+              filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.35))',
+            }}
+          />
+          <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
+            ParakhMitra
+          </h1>
+          <p style={{ fontSize: 16, opacity: 0.8, marginTop: 12, lineHeight: 1.5, maxWidth: 320 }}>
+            Field companion for Legal Metrology inspection officers — scan a package, get an
+            instant compliance verdict backed by an immutable audit record.
           </p>
         </div>
 
-        <div className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <TriangleAlert />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <Button
-            size="lg"
-            variant="secondary"
-            className="w-full"
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {error && <Banner kind="error">{error}</Banner>}
+          <button
+            className="btn btn--block"
+            style={{ background: '#fff', color: '#1a365d', minHeight: 52 }}
             onClick={handleSignIn}
             disabled={loading}
           >
-            {loading ? <Spinner /> : <GoogleGlyph />}
+            {loading ? <Spinner dark /> : <GoogleGlyph />}
             {loading ? 'Redirecting…' : 'Continue with Google'}
-          </Button>
-          <p className="text-center text-xs leading-relaxed opacity-70">
+          </button>
+          <p style={{ fontSize: 12, opacity: 0.7, textAlign: 'center', lineHeight: 1.5, margin: 0 }}>
             Access is restricted to authorised inspection officers and administrators.
           </p>
         </div>

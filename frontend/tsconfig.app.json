@@ -5,11 +5,6 @@
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
     "types": ["vite/client"],
-
-    /* Path alias — shadcn/ui components import as "@/components/ui/button".
-       Resolved relative to this file; baseUrl is deprecated in TypeScript 6. */
-    "paths": { "@/*": ["./src/*"] },
-
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 

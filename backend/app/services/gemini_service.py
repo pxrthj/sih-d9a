@@ -24,10 +24,7 @@ Extraction Guidelines:
 6. `use_by_date`: The use-by, best-before or expiry date exactly as printed (e.g. 'Best Before 9 months from Mfg', '12/2026'). Return null if not present.
 7. `lot_batch_number`: The lot, batch or code number exactly as printed (e.g. 'LOT B23', 'Batch No. 4471'). Return null if not present.
 8. `consumer_care`: Contact details for consumer grievances/care including designation/name, address, telephone number, and/or email. Return null if not present.
-9. `country_of_origin`: The country of origin, manufacture or assembly, exactly as printed (e.g. 'Made in Vietnam', 'Country of Origin: China'). Only imported packs carry this. Return null if not present.
-10. `import_declared`: true when the package presents itself as IMPORTED — it says 'Imported by', 'Imported & Marketed by', or gives a manufacturer address outside India. false when it reads as manufactured or packed in India (e.g. 'Mfd. by' with an Indian address). null if these photographs genuinely cannot tell. Report what the pack says; do not reason about whether the product is usually imported.
-11. `declaration_language`: the script the MANDATORY declarations themselves are printed in — 'english', 'hindi' if in Devanagari, 'both' if the declarations appear in both, or 'other' ONLY when they appear exclusively in some language that is neither Hindi nor English. Judge the declarations, not the brand name or marketing copy. null if you cannot tell.
-12. `declarations_present`: An array of strings identifying every declaration category found across all images (e.g. ['product_name', 'manufacturer_packer_importer', 'net_quantity', 'mrp', 'mfg_or_pack_date', 'use_by_date', 'lot_batch_number', 'consumer_care', 'ingredients', 'nutritional_information']).
+9. `declarations_present`: An array of strings identifying every declaration category found across all images (e.g. ['product_name', 'manufacturer_packer_importer', 'net_quantity', 'mrp', 'mfg_or_pack_date', 'use_by_date', 'lot_batch_number', 'consumer_care', 'ingredients', 'nutritional_information']).
 
 THE COMBINED DECLARATION BLOCK — read this part with particular care.
 Many Indian packs do NOT print the MRP, the use-by date and the lot/batch number in the main

@@ -1,29 +1,23 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Download, Inbox, MapPin, TriangleAlert } from 'lucide-react'
-import { useAuth } from '@/auth/AuthContext'
-import { useScan } from '@/hooks/useScans'
-import { fetchEvidenceUrls, fetchImprovementNotice } from '@/lib/api'
+import { useAuth } from '../auth/AuthContext'
+import { useScan } from '../hooks/useScans'
+import { fetchEvidenceUrls, fetchImprovementNotice } from '../lib/api'
 import {
+  VerdictBanner,
+  ExtractedFields,
+  ViolationList,
   AdvisoryList,
   EvidencePhotos,
-  ExtractedFields,
-  VerdictBanner,
-  ViolationList,
-} from '@/components/ScanResult'
-import { AppBar } from '@/components/Layout'
-import { EmptyState } from '@/components/empty-state'
-import { SectionLabel, Spinner } from '@/components/page-header'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { formatDateTime, formatLocation, scanTitle, violationCount } from '@/lib/format'
+} from '../components/ScanResult'
+import { Banner, EmptyState, Spinner } from '../components/ui'
+import { ChevronLeft, InboxIcon, DownloadIcon, MapPinIcon } from '../components/Icons'
+import { formatDateTime, formatLocation, scanTitle, violationCount } from '../lib/format'
 
 /**
  * Evidence photos for a record. The bucket is private, so the backend mints
- * short-lived signed URLs after checking that this user owns the scan (or is an
- * admin) — the same rule that guards the notice.
+ * short-lived signed URLs after checking that this user owns the scan (or is
+ * an admin) — the same rule that guards the notice.
  */
 function EvidenceSection({ scanId }: { scanId: string | number }) {
   const [urls, setUrls] = useState<string[]>([])
@@ -54,16 +48,11 @@ function EvidenceSection({ scanId }: { scanId: string | number }) {
   }, [scanId])
 
   return (
-    <section className="space-y-2">
-      <SectionLabel>Evidence photos</SectionLabel>
-      {error && (
-        <Alert variant="destructive">
-          <TriangleAlert />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+    <div>
+      <div className="section-label">Evidence photos</div>
+      {error && <Banner kind="error">{error}</Banner>}
       <EvidencePhotos urls={urls} />
-    </section>
+    </div>
   )
 }
 
@@ -93,17 +82,12 @@ function DownloadNoticeButton({ scanId }: { scanId: string | number }) {
   }
 
   return (
-    <div className="space-y-2">
-      {error && (
-        <Alert variant="destructive">
-          <TriangleAlert />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      <Button className="w-full" onClick={handleDownload} disabled={downloading}>
-        {downloading ? <Spinner /> : <Download />}
+    <div className="stack-sm">
+      {error && <Banner kind="error">{error}</Banner>}
+      <button className="btn btn--primary btn--block" onClick={handleDownload} disabled={downloading}>
+        {downloading ? <Spinner /> : <DownloadIcon size={18} />}
         {downloading ? 'Generating notice…' : 'Download Improvement Notice'}
-      </Button>
+      </button>
     </div>
   )
 }
@@ -114,75 +98,85 @@ export default function ScanDetail() {
   const { isAdmin } = useAuth()
   const { scan, loading, error } = useScan(id)
 
-  // Loading / error / not-found, shared by both layouts.
+  // Loading / error / not-found states, shared by both layouts.
   const statusView = loading ? (
-    <div className="flex justify-center py-16">
-      <Spinner className="text-muted-foreground size-6" />
+    <div className="center-screen">
+      <Spinner dark />
     </div>
   ) : error ? (
-    <Alert variant="destructive">
-      <TriangleAlert />
-      <AlertDescription>Couldn’t load record: {error}</AlertDescription>
-    </Alert>
+    <Banner kind="error">Couldn’t load record: {error}</Banner>
   ) : !scan ? (
-    <Card>
+    <div className="card">
       <EmptyState
-        icon={Inbox}
+        icon={<InboxIcon size={48} />}
         title="Record not found"
         text="This inspection record doesn’t exist or isn’t visible to your account."
       />
-    </Card>
+    </div>
   ) : null
 
   // The record's sections, defined once and arranged differently per layout.
-  const loc = scan ? formatLocation(scan) : null
-
   const header = scan && (
     <div>
-      <h1 className="text-xl font-semibold tracking-tight">{scanTitle(scan.extracted)}</h1>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {scan.category && <Badge variant="secondary">{scan.category}</Badge>}
-        <span className="text-muted-foreground text-sm">{formatDateTime(scan.created_at)}</span>
+      <h1 className="headline" style={{ fontSize: 21 }}>
+        {scanTitle(scan.extracted)}
+      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+        {scan.category && <span className="pill pill--neutral">{scan.category}</span>}
+        <span className="muted" style={{ fontSize: 13 }}>
+          {formatDateTime(scan.created_at)}
+        </span>
       </div>
-      {loc && (
-        <a
-          href={loc.mapsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1.5 text-xs transition-colors"
-        >
-          <MapPin className="size-3.5" />
-          {loc.text}
-        </a>
-      )}
+      {(() => {
+        const loc = formatLocation(scan)
+        if (!loc) return null
+        return (
+          <a
+            href={loc.mapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="muted"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12.5,
+              marginTop: 8,
+              textDecoration: 'none',
+            }}
+          >
+            <MapPinIcon size={15} />
+            {loc.text}
+          </a>
+        )
+      })()}
     </div>
   )
-
   const verdict = scan && (
     <VerdictBanner status={scan.status} violationCount={violationCount(scan)} />
   )
   const evidence = scan && <EvidenceSection scanId={scan.id} />
   const violations = scan && (
-    <section className="space-y-2">
-      <SectionLabel>Violations</SectionLabel>
+    <div>
+      <div className="section-label">Violations</div>
       <ViolationList violations={scan.violations} />
-    </section>
+    </div>
   )
   const advisories = scan && <AdvisoryList advisories={scan.advisories} />
   const extracted = scan && (
-    <section className="space-y-2">
-      <SectionLabel>Extracted declarations</SectionLabel>
+    <div>
+      <div className="section-label">Extracted declarations</div>
       <ExtractedFields extracted={scan.extracted} />
-    </section>
+    </div>
   )
   const report = scan && (
-    <section className="space-y-2">
-      <SectionLabel>Report</SectionLabel>
+    <div>
+      <div className="section-label">Report</div>
       <DownloadNoticeButton scanId={scan.id} />
-    </section>
+    </div>
   )
   const immutableNote = (
-    <p className="text-muted-foreground text-center text-xs">
+    <p className="muted" style={{ fontSize: 12, textAlign: 'center', lineHeight: 1.5 }}>
       Immutable record · cannot be edited or deleted.
     </p>
   )
@@ -190,23 +184,22 @@ export default function ScanDetail() {
   // ---- Admin: inside the desktop console, a two-column record view ----
   if (isAdmin) {
     return (
-      <div className="space-y-6">
-        <Button variant="ghost" size="sm" className="-ml-2" onClick={() => navigate(-1)}>
-          <ChevronLeft />
-          Back
-        </Button>
+      <div className="stack">
+        <button className="admin-back" onClick={() => navigate(-1)}>
+          <ChevronLeft size={18} /> Back
+        </button>
         {statusView}
         {scan && (
           <>
             {header}
             {verdict}
-            <div className="grid grid-cols-3 gap-6">
-              <div className="col-span-2 space-y-6">
+            <div className="admin-detail__grid">
+              <div className="admin-detail__main stack">
                 {violations}
                 {advisories}
                 {extracted}
               </div>
-              <aside className="space-y-6">
+              <aside className="admin-detail__side stack">
                 {evidence}
                 {report}
                 {immutableNote}
@@ -218,18 +211,25 @@ export default function ScanDetail() {
     )
   }
 
-  // ---- Officer: a standalone full-screen mobile view ----
+  // ---- Officer: standalone full-screen mobile view ----
   return (
-    <div className="bg-background min-h-screen">
-      <AppBar subtitle="Inspection record · read-only" />
-      <main className="app-column space-y-5 px-5 pt-5 pb-12">
-        <Button variant="ghost" size="sm" className="-ml-2" onClick={() => navigate(-1)}>
-          <ChevronLeft />
-          Back
-        </Button>
+    <div className="app-shell">
+      <header className="appbar appbar--back">
+        <button className="appbar__backbtn" onClick={() => navigate(-1)} aria-label="Back">
+          <ChevronLeft size={22} />
+        </button>
+        <div>
+          <div className="appbar__title" style={{ fontSize: 15 }}>
+            Inspection record
+          </div>
+          <div className="appbar__subtitle">Read-only</div>
+        </div>
+      </header>
+
+      <main className="app-scroll" style={{ paddingBottom: 40 }}>
         {statusView}
         {scan && (
-          <>
+          <div className="stack">
             {header}
             {verdict}
             {evidence}
@@ -238,7 +238,7 @@ export default function ScanDetail() {
             {extracted}
             {report}
             {immutableNote}
-          </>
+          </div>
         )}
       </main>
     </div>

@@ -1,24 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera, MapPin, ScanLine, TriangleAlert, X } from 'lucide-react'
-import { useAuth } from '@/auth/AuthContext'
-import { createScan, uploadEvidencePhoto } from '@/lib/api'
-import { MAX_LABEL_IMAGES, type CaptureCoords } from '@/lib/types'
-import { PageHeader, SectionLabel, Spinner } from '@/components/page-header'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { cn } from '@/lib/utils'
+import { useAuth } from '../auth/AuthContext'
+import { createScan, uploadEvidencePhoto } from '../lib/api'
+import { MAX_LABEL_IMAGES, type CaptureCoords } from '../lib/types'
+import { Banner } from '../components/ui'
+import { CameraIcon, MapPinIcon, ScanIcon } from '../components/Icons'
 
-// Product categories an officer can tag a scan with. Every category runs the
-// same Legal Metrology rules today; this is for classification and record.
+// Product categories the officer can tag a scan with. All categories run the
+// same 8 Legal Metrology rules today; this list is for classification/record.
 const PRODUCT_CATEGORIES = [
   'General',
   'Food & Beverages',
@@ -30,70 +19,81 @@ const PRODUCT_CATEGORIES = [
 ] as const
 
 // Suggested purpose for each slot. Only the first photo is required — the rest
-// exist for packs carrying declarations on more than two panels, or for a
+// exist for packs that carry declarations on more than two panels, or for a
 // close-up of a small print block.
 const SLOT_HINTS = ['Front', 'Back', 'Side / base', 'Close-up'] as const
 
-function CaptureTile({
-  label,
-  file,
-  onReplace,
-  onRemove,
-}: {
+interface CaptureTileProps {
   label: string
   file: File
   onReplace: (file: File | null) => void
   onRemove: () => void
-}) {
-  // Derive an object URL for the preview; revoke it when the file changes.
+}
+
+function CaptureTile({ label, file, onReplace, onRemove }: CaptureTileProps) {
+  // Derive an object URL for the preview; revoke it when the file changes/unmounts.
   const preview = useMemo(() => URL.createObjectURL(file), [file])
-  useEffect(() => () => URL.revokeObjectURL(preview), [preview])
+  useEffect(() => {
+    return () => URL.revokeObjectURL(preview)
+  }, [preview])
 
   return (
-    <div className="bg-muted relative aspect-4/3 overflow-hidden rounded-lg border">
-      <img src={preview} alt={`${label} preview`} className="size-full object-cover" />
-      <span className="bg-card/90 absolute top-2 left-2 rounded px-2 py-0.5 text-xs font-medium">
-        {label}
-      </span>
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${label}`}
-        className="bg-card/90 text-destructive absolute top-2 right-2 grid size-6 place-items-center rounded-full"
-      >
-        <X className="size-3.5" />
-      </button>
-      <label className="bg-card/90 absolute inset-x-2 bottom-2 cursor-pointer rounded py-1 text-center text-xs font-medium">
+    <div className="capture capture--filled">
+      <span className="capture__badge">{label}</span>
+      <img className="capture__preview" src={preview} alt={`${label} preview`} />
+      <label className="capture__change" style={{ cursor: 'pointer' }}>
         Change
         <input
           type="file"
           accept="image/*"
           capture="environment"
-          className="sr-only"
+          style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
           onChange={(e) => onReplace(e.target.files?.[0] ?? null)}
         />
       </label>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${label}`}
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          width: 26,
+          height: 26,
+          borderRadius: '50%',
+          border: 'none',
+          background: 'rgba(255,255,255,0.92)',
+          color: 'var(--compliance-error, #991B1B)',
+          fontSize: 15,
+          fontWeight: 700,
+          lineHeight: 1,
+          cursor: 'pointer',
+        }}
+      >
+        ×
+      </button>
     </div>
   )
 }
 
 function AddTile({ label, onPick }: { label: string; onPick: (file: File | null) => void }) {
   return (
-    <label className="border-input text-muted-foreground hover:border-ring hover:text-foreground flex aspect-4/3 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed transition-colors">
-      <Camera className="size-6" />
-      <span className="text-xs font-medium">{label}</span>
+    <label className="capture">
+      <span className="capture__badge">{label}</span>
+      <span className="capture__hint">
+        <CameraIcon size={26} />
+        Tap to add photo
+      </span>
       <input
         type="file"
         accept="image/*"
         capture="environment"
-        className="sr-only"
         onChange={(e) => onPick(e.target.files?.[0] ?? null)}
       />
     </label>
   )
 }
-
-type LocationStatus = 'locating' | 'ok' | 'denied' | 'unavailable'
 
 /** A quiet line telling the officer whether the scan's location was captured. */
 function LocationNote({
@@ -101,7 +101,7 @@ function LocationNote({
   coords,
   onRetry,
 }: {
-  status: LocationStatus
+  status: 'locating' | 'ok' | 'denied' | 'unavailable'
   coords: CaptureCoords | null
   onRetry: () => void
 }) {
@@ -114,15 +114,29 @@ function LocationNote({
         : status === 'denied'
           ? 'Location off — the notice won’t show where this was scanned.'
           : 'Location unavailable on this device.'
+  const tone = status === 'ok' ? 'var(--compliance-ok, #166534)' : 'var(--muted, #6b7280)'
 
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <MapPin className={cn('size-4', status === 'ok' ? 'text-success' : 'text-muted-foreground')} />
-      <span className={status === 'ok' ? 'text-success' : 'text-muted-foreground'}>{text}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: tone, marginTop: 10 }}>
+      <MapPinIcon size={16} />
+      <span>{text}</span>
       {(status === 'denied' || status === 'unavailable') && (
-        <Button variant="link" size="sm" className="ml-auto h-auto p-0 text-xs" onClick={onRetry}>
+        <button
+          type="button"
+          onClick={onRetry}
+          style={{
+            marginLeft: 'auto',
+            background: 'none',
+            border: 'none',
+            color: 'var(--primary-deep, #002045)',
+            fontSize: 12.5,
+            fontWeight: 600,
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        >
           Try again
-        </Button>
+        </button>
       )}
     </div>
   )
@@ -134,10 +148,12 @@ export default function NewScan() {
   const [photos, setPhotos] = useState<File[]>([])
   const [category, setCategory] = useState('General')
   const [submitting, setSubmitting] = useState(false)
-  const [stage, setStage] = useState('')
+  const [stage, setStage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [coords, setCoords] = useState<CaptureCoords | null>(null)
-  const [locStatus, setLocStatus] = useState<LocationStatus>('locating')
+  const [locStatus, setLocStatus] = useState<'locating' | 'ok' | 'denied' | 'unavailable'>(
+    'locating',
+  )
 
   const canAddMore = photos.length < MAX_LABEL_IMAGES
   const canSubmit = photos.length > 0 && !!user && !submitting
@@ -171,8 +187,8 @@ export default function NewScan() {
     })
   }, [])
 
-  // Ask for location when the screen opens, so the browser's permission prompt
-  // is separate from tapping "Scan".
+  // Ask for location when the scan screen opens, so the browser's permission
+  // prompt is separate from tapping "Scan".
   useEffect(() => {
     void captureLocation()
   }, [captureLocation])
@@ -220,44 +236,57 @@ export default function NewScan() {
 
   if (submitting) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <div className="bg-primary text-primary-foreground grid size-16 place-items-center rounded-2xl">
-          <ScanLine className="size-7" />
+      <div className="center-screen" style={{ flexDirection: 'column', gap: 20, minHeight: '60vh' }}>
+        <div
+          style={{
+            width: 76,
+            height: 76,
+            borderRadius: 22,
+            background: 'var(--primary-deep)',
+            color: '#fff',
+            display: 'grid',
+            placeItems: 'center',
+            position: 'relative',
+          }}
+        >
+          <ScanIcon size={34} />
+          <span
+            className="spinner"
+            style={{ position: 'absolute', width: 76, height: 76, borderWidth: 3 }}
+          />
         </div>
-        <div>
-          <div className="font-semibold">Analysing package</div>
-          <p className="text-muted-foreground mt-1 flex items-center justify-center gap-2 text-sm">
-            <Spinner />
+        <div style={{ textAlign: 'center' }}>
+          <div className="title-lg">Analysing package</div>
+          <div className="muted" style={{ fontSize: 13.5, marginTop: 6 }}>
             {stage}
-          </p>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="New scan"
-        description="Capture every panel that carries a declaration, for a Legal Metrology compliance check."
-      />
+    <div className="stack">
+      <div>
+        <h1 className="headline">New Scan</h1>
+        <p className="muted" style={{ fontSize: 14, marginTop: 4 }}>
+          Capture every panel that carries a declaration, for a Legal Metrology compliance check.
+        </p>
+      </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <TriangleAlert />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      {error && <Banner kind="error">{error}</Banner>}
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <SectionLabel>Package photos</SectionLabel>
-          <span className="text-muted-foreground text-xs font-medium tabular-nums">
+      <div>
+        <div className="flex-between" style={{ marginBottom: 10 }}>
+          <div className="section-label" style={{ margin: 0 }}>
+            Package photos
+          </div>
+          <span className="muted" style={{ fontSize: 12.5, fontWeight: 600 }}>
             {photos.length} of {MAX_LABEL_IMAGES}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {photos.map((file, index) => (
             <CaptureTile
               key={`${file.name}-${file.lastModified}-${index}`}
@@ -269,45 +298,46 @@ export default function NewScan() {
           ))}
           {canAddMore && (
             <AddTile
-              label={photos.length === 0 ? 'Add front' : `Add ${SLOT_HINTS[photos.length] ?? 'photo'}`}
+              label={photos.length === 0 ? 'Front' : `Add ${SLOT_HINTS[photos.length] ?? 'photo'}`}
               onPick={addPhoto}
             />
           )}
         </div>
 
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          One photo is enough to scan, but a declaration on a panel you don’t photograph is reported
-          as missing. Add up to {MAX_LABEL_IMAGES} — and if the MRP, use-by date and lot number are
-          crammed into one tiny box, add a close-up of it.
+        <p className="help">
+          One photo is enough to scan, but a declaration on a panel you don&rsquo;t photograph is
+          reported as missing. Add up to {MAX_LABEL_IMAGES} &mdash; and if the MRP, use-by date and
+          lot number are crammed into one tiny box, add a close-up of it.
         </p>
 
         <LocationNote status={locStatus} coords={coords} onRetry={captureLocation} />
-      </section>
+      </div>
 
-      <section className="space-y-2">
-        <Label htmlFor="category">Product category</Label>
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger id="category">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PRODUCT_CATEGORIES.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          All categories currently run the same Legal Metrology checks; the category is recorded
-          with each scan.
+      <div>
+        <label className="label" htmlFor="category">
+          Product Category
+        </label>
+        <select
+          id="category"
+          className="select"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          {PRODUCT_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <p className="help">
+          All categories currently run the same Legal Metrology checks; category is recorded with
+          each scan.
         </p>
-      </section>
+      </div>
 
-      <Button size="lg" className="w-full" disabled={!canSubmit} onClick={handleScan}>
-        <ScanLine />
-        Scan for compliance
-      </Button>
+      <button className="btn btn--primary btn--block" disabled={!canSubmit} onClick={handleScan}>
+        <ScanIcon size={20} /> Scan for Compliance
+      </button>
     </div>
   )
 }
