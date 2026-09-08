@@ -13,6 +13,15 @@ logger = logging.getLogger("legal_metrology_backend")
 
 settings = get_settings()
 
+# Say out loud which database this process will write to. Development and
+# production are separate Supabase projects selected by a gitignored .env, so
+# without this line the two are indistinguishable from the terminal -- and the
+# scans table is immutable, which makes a write to the wrong one unfixable.
+logger.info(
+    f"Supabase project: {settings.project_ref()} | "
+    f"bucket: {settings.STORAGE_BUCKET} | notice QR base: {settings.APP_BASE_URL}"
+)
+
 app = FastAPI(
     title="Legal Metrology Label Compliance Checker API",
     description="Backend service for automated Legal Metrology label extraction and rule compliance auditing.",
@@ -42,6 +51,10 @@ def health_check():
         "service": "legal-metrology-backend",
         "gemini_model": settings.GEMINI_MODEL,
         "storage_bucket": settings.STORAGE_BUCKET,
+        # So a deployed instance can be checked for which database it is on
+        # without opening a dashboard. Public information: this is the Supabase
+        # URL the browser bundle already carries.
+        "supabase_project": settings.project_ref(),
     }
 
 

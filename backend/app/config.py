@@ -2,6 +2,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 from typing import List
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
@@ -45,6 +46,23 @@ class Settings(BaseModel):
     )
     STORAGE_BUCKET: str = Field(default="evidence-photos")
     CORS_ORIGINS: List[str] = Field(default_factory=_parse_cors_origins)
+
+    def project_ref(self) -> str:
+        """The Supabase project this process is attached to, e.g. 'abcd1234'.
+
+        Development and production are two different Supabase projects, and the
+        only thing selecting between them is a gitignored .env file. That makes
+        "which database am I writing to?" a question with no visible answer --
+        so the answer is logged at startup and returned by /health.
+
+        Safe to expose: the project ref is the public Supabase URL, which the
+        browser bundle already ships. The service-role key is the secret, and
+        it never appears here.
+        """
+        host = urlparse(self.SUPABASE_URL).hostname or ""
+        if not host:
+            return "unset"
+        return host.split(".")[0]
 
     def validate_keys(self) -> None:
         missing = []

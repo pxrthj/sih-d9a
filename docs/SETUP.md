@@ -4,6 +4,28 @@ Everything you must configure outside the code, plus commands to run. Do this on
 
 ---
 
+## 0. Two Supabase projects, not one
+
+There are two: **production**, which holds real inspection records and is what Render and Vercel
+talk to, and **development**, which is what a laptop talks to. Set up the development one and
+follow the rest of this file against it.
+
+Why it is worth the extra project: `scans` has no update or delete policy and the backend only
+ever inserts, so a record written by accident cannot be removed through the app. Sharing one
+database between development and production means every test scan is permanent, mixed in with
+real evidence, and removable only by hand in the SQL editor — the exact operation the schema
+exists to prevent.
+
+The only thing selecting between the two is a gitignored env file, so both halves of the app say
+which one they are on:
+
+- the backend logs `Supabase project: <ref>` at startup, and returns it from `/health`
+- the frontend shows a badge in the bottom-left naming the project, under `npm run dev` only
+
+Production's keys belong in the Render and Vercel dashboards. They should not be on a laptop.
+
+---
+
 ## 1. Run the database SQL
 
 Open **Supabase Dashboard → SQL Editor → New query**, paste the entire contents of
@@ -38,13 +60,19 @@ This single script:
 2. **APIs & Services → OAuth consent screen** → External → fill app name, support email → save.
    Add your test Google accounts under **Test users** while the app is unpublished.
 3. **APIs & Services → Credentials → Create Credentials → OAuth client ID** → **Web application**.
-4. Under **Authorized redirect URIs**, add your Supabase callback URL:
+4. Under **Authorized redirect URIs**, add the Supabase callback URL for **each** project — one
+   OAuth client can serve both, so add two entries rather than creating a second client:
    ```
-   https://eknufycjnzwssdttcpsr.supabase.co/auth/v1/callback
+   https://<production-project-ref>.supabase.co/auth/v1/callback
+   https://<development-project-ref>.supabase.co/auth/v1/callback
    ```
 5. Copy the **Client ID** and **Client secret**.
 
 ### 2b. Supabase
+
+Do this in the **development** project's dashboard. Production already has it, and the two are
+configured independently — the same Client ID and secret go into both.
+
 1. **Dashboard → Authentication → Providers → Google** → enable it → paste the Client ID and
    Client secret from the step above → save.
 2. **Dashboard → Authentication → URL Configuration**:
@@ -54,6 +82,8 @@ This single script:
 ---
 
 ## 3. Environment variables
+
+Both files below take the **development** project's values (see section 0).
 
 **Frontend** — `frontend/.env.local` (already set for this project):
 ```
@@ -85,6 +115,9 @@ npm run dev
 
 Then open <http://localhost:5173>, click **Continue with Google**, and sign in with an admin or
 `@ves.ac.in` account.
+
+Before the first scan, confirm you are on the development database: the backend's startup line
+and the badge in the bottom-left of the page must both name the development project.
 
 ---
 

@@ -998,3 +998,42 @@ a {
   background: var(--surface-container);
   color: var(--on-surface-variant);
 }
+
+/* ============================================================
+   Dev-only database badge
+   Names the Supabase project this build is attached to. Development and
+   production are separate projects chosen by a gitignored .env.local, and
+   scans are immutable — a test record written to production cannot be
+   removed through the app. Present under `npm run dev` only.
+   ============================================================ */
+.dbbadge {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 32, 69, 0.86);
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--shadow-card);
+  /* Informational only: never intercepts a tap meant for the app beneath it. */
+  pointer-events: none;
+  user-select: none;
+}
+
+.dbbadge b {
+  font-weight: 600;
+}
+
+.dbbadge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--warning-bg);
+}
