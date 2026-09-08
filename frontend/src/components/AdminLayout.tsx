@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { HomeIcon, HistoryIcon, UsersIcon, ProfileIcon, MonitorIcon } from './Icons'
+import { HomeIcon, HistoryIcon, UsersIcon, ProfileIcon, MonitorIcon, MapPinIcon } from './Icons'
 import { Avatar } from './ui'
 import logo from '../assets/logo.png'
 
@@ -10,6 +10,7 @@ import logo from '../assets/logo.png'
 const NAV = [
   { to: '/', end: true, label: 'Dashboard', Icon: HomeIcon },
   { to: '/history', end: false, label: 'Inspections', Icon: HistoryIcon },
+  { to: '/map', end: false, label: 'Map', Icon: MapPinIcon },
   { to: '/users', end: false, label: 'Users', Icon: UsersIcon },
   { to: '/profile', end: false, label: 'Profile', Icon: ProfileIcon },
 ] as const

@@ -1037,3 +1037,97 @@ a {
   border-radius: var(--radius-full);
   background: var(--warning-bg);
 }
+
+/* ============================================================
+   Inspection map
+   Leaflet renders into .map-canvas, which must carry a real height —
+   the library measures its container and a zero-height box draws nothing.
+   ============================================================ */
+.map-panel {
+  position: relative;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.map-canvas {
+  height: min(64vh, 640px);
+  min-height: 360px;
+  width: 100%;
+  background: var(--surface-container-low);
+  z-index: 0;
+}
+
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--card-border);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+}
+
+.map-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.map-legend__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px var(--outline-variant);
+}
+
+/* Covers the canvas while loading, or when nothing can be plotted. The map
+   stays mounted underneath so Leaflet keeps its measured size. */
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 500;
+  background: rgba(247, 249, 251, 0.72);
+}
+
+.map-overlay--solid {
+  background: var(--surface-container-lowest);
+}
+
+/* Marker popups. Leaflet owns the outer bubble; these style our contents. */
+.mappop {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 170px;
+}
+
+.mappop__title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.mappop__meta {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+}
+
+.mappop__link {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--royal);
+  cursor: pointer;
+  text-decoration: underline;
+}

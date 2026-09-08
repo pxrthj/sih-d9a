@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './auth/AuthContext'
 import { FullScreenLoader } from './components/ui'
@@ -13,6 +14,11 @@ import ScanDetail from './screens/ScanDetail'
 import Profile from './screens/Profile'
 import Users from './screens/Users'
 import Verify from './screens/Verify'
+
+// Split out: the map pulls in Leaflet, ~45 kB gzipped, for a screen only the
+// admin console links to. Officers work from a phone in the field and should
+// not pay for it on every load.
+const InspectionMap = lazy(() => import('./screens/InspectionMap'))
 
 export default function App() {
   const { session, loading, accessDenied, isAdmin } = useAuth()
@@ -58,6 +64,16 @@ export default function App() {
         <Route path="/history" element={<History />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/users" element={<Users />} />
+        {/* Linked only from the admin console, but left reachable for officers:
+            RLS scopes the rows either way, so an officer sees their own work. */}
+        <Route
+          path="/map"
+          element={
+            <Suspense fallback={<FullScreenLoader label="Loading map…" />}>
+              <InspectionMap />
+            </Suspense>
+          }
+        />
         {isAdmin && <Route path="/scan/:id" element={<ScanDetail />} />}
       </Route>
 
