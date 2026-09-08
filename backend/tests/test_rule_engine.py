@@ -103,6 +103,60 @@ def test_unrecognised_units_fail_the_standard_unit_rule(unit):
     assert "Rule 6(1)(c)" in refs(compliant(net_quantity=NetQuantity(value="2", unit=unit)))
 
 
+# --------------------------------------------------------------------------
+# Net quantity: a lawful declaration in an Indian script is still lawful
+#
+# A pack that declares "100 ग्राम" has complied with Rule 6(1)(c). If the engine
+# does not recognise the word it reports a violation the packer did not commit,
+# which is worse than reporting nothing at all.
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "unit",
+    [
+        "ग्राम", "किलोग्राम", "मिलीलीटर", "लीटर",       # Hindi / Marathi
+        "গ্রাম", "কিলোগ্রাম", "মিলিলিটার",              # Bengali
+        "ગ્રામ", "કિલો",                                # Gujarati
+        "ਗ੍ਰਾਮ", "ਲੀਟਰ",                                # Punjabi
+        "கிராம்", "கிலோ", "மில்லிலிட்டர்",                # Tamil
+        "గ్రాము", "కిలోగ్రాము", "లీటరు",                  # Telugu
+        "ಗ್ರಾಂ", "ಕಿಲೋ",                                # Kannada
+        "ഗ്രാം", "കിലോഗ്രാം",                           # Malayalam
+        "ଗ୍ରାମ", "ଲିଟର",                                # Odia
+        "گرام", "کلوگرام",                              # Urdu
+    ],
+)
+def test_indian_script_units_are_standard_units(unit):
+    assert "Rule 6(1)(c)" not in refs(compliant(net_quantity=NetQuantity(value="100", unit=unit)))
+
+
+@pytest.mark.parametrize("unit", ["दर्जन", "ডজন", "டஜன்", "ਦਰਜਨ", "درجن"])
+def test_prohibited_units_are_caught_in_indian_scripts_too(unit):
+    """Otherwise "1 दर्जन" is merely unrecognised and the notice cites 6(1)(c)."""
+    found = refs(compliant(net_quantity=NetQuantity(value="1", unit=unit)))
+    assert "Rule 13(4)" in found
+
+
+@pytest.mark.parametrize("unit", ["मि. ली.", "मि.ली.", " ग्राम ", "ملی لیٹر", "कि.ग्रा."])
+def test_units_are_matched_through_the_punctuation_packs_actually_print(unit):
+    assert "Rule 6(1)(c)" not in refs(compliant(net_quantity=NetQuantity(value="100", unit=unit)))
+
+
+def test_the_same_word_matches_however_it_is_encoded():
+    """Devanagari can reach us pre-composed or decomposed; both are the word."""
+    import unicodedata
+
+    decomposed = unicodedata.normalize("NFD", "ग्राम")
+    assert "Rule 6(1)(c)" not in refs(
+        compliant(net_quantity=NetQuantity(value="100", unit=decomposed))
+    )
+
+
+def test_an_unknown_indian_word_still_fails_rather_than_being_waved_through():
+    """Widening the vocabulary must not turn the rule into a rubber stamp."""
+    assert "Rule 6(1)(c)" in refs(compliant(net_quantity=NetQuantity(value="2", unit="मुट्ठी")))
+
+
 def test_quantity_without_a_value_is_not_a_declaration():
     assert "Rule 6(1)(c)" in refs(compliant(net_quantity=NetQuantity(value="  ", unit="g")))
 

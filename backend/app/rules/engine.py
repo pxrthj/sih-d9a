@@ -13,7 +13,9 @@ HOW TO EDIT (for non-programmers / the legal team):
     English `issue`, its `rule_ref`, and a small `check` function.
   - To change wording, edit the `issue` / `rule_ref` strings.
   - To change what counts as a valid unit, edit STANDARD_UNITS / UNIT_ALIASES /
-    NON_STANDARD_UNITS below.
+    INDIC_UNIT_ALIASES / NON_STANDARD_UNITS below. INDIC_UNIT_ALIASES is where
+    the regional-script spellings live, and it is the one most likely to need
+    a word adding.
   - To add/remove a rule, add/remove an entry in RULES.
 
 ADVISORIES (see build_advisories at the bottom) are a SEPARATE, weaker output.
@@ -22,6 +24,7 @@ and they never change the compliance status. Anything we can see in a photo but
 cannot adjudicate from one belongs there, not in RULES.
 """
 
+import unicodedata
 from typing import Callable, Dict, List, Optional, Tuple
 from app.schemas.scan import Advisory, ExtractedData, Violation
 
@@ -45,12 +48,96 @@ UNIT_ALIASES = {
     "nos": "n", "no": "n", "unit": "u", "units": "u", "count": "u",
 }
 
+# Indian-language spellings of the SAME standard units.
+#
+# Why this exists: packs sold in India routinely declare the net quantity in a
+# regional script ("100 ग्राम"), and that is a perfectly lawful declaration.
+# Without these entries the unit is simply unrecognised, and Rule 6(1)(c) fires
+# a violation against a compliant package -- the rule engine failing to read,
+# not the packer failing to declare.
+#
+# One thing that makes this list safe to extend: an alias only decides whether a
+# unit is STANDARD, PROHIBITED or UNRECOGNISED. Mapping a word to the wrong
+# *standard* unit (millilitre vs milligram, say) changes no verdict, because
+# both are standard. So an imprecise entry here cannot produce a wrong verdict;
+# only a missing one can.
+#
+# NEEDS REVIEW: these spellings were compiled without a native reader for every
+# script. Someone who reads each language should confirm them, and add the
+# abbreviations actually printed on packs in their state.
+INDIC_UNIT_ALIASES = {
+    # Hindi / Marathi (Devanagari)
+    "ग्राम": "g", "ग्रॅम": "g", "ग्रा": "g",
+    "किलोग्राम": "kg", "किलोग्रॅम": "kg", "किलो": "kg", "किग्रा": "kg",
+    "मिलीग्राम": "mg", "मिग्रा": "mg",
+    "मिलीलीटर": "ml", "मिलिलिटर": "ml", "मिली": "ml",
+    "लीटर": "l", "लिटर": "l",
+    "सेंटीमीटर": "cm", "सेमी": "cm", "मीटर": "m",
+    "नग": "n", "संख्या": "n",
+
+    # Bengali / Assamese
+    "গ্রাম": "g", "কিলোগ্রাম": "kg", "কেজি": "kg",
+    "মিলিগ্রাম": "mg", "মিলিলিটার": "ml", "লিটার": "l", "মিটার": "m",
+
+    # Gujarati
+    "ગ્રામ": "g", "કિલોગ્રામ": "kg", "કિલો": "kg",
+    "મિલિગ્રામ": "mg", "મિલિલિટર": "ml", "લિટર": "l", "મીટર": "m",
+
+    # Punjabi (Gurmukhi)
+    "ਗ੍ਰਾਮ": "g", "ਕਿਲੋਗ੍ਰਾਮ": "kg", "ਕਿਲੋ": "kg",
+    "ਮਿਲੀਗ੍ਰਾਮ": "mg", "ਮਿਲੀਲੀਟਰ": "ml", "ਲੀਟਰ": "l", "ਮੀਟਰ": "m",
+
+    # Tamil
+    "கிராம்": "g", "கிராம": "g",
+    "கிலோகிராம்": "kg", "கிலோ": "kg",
+    "மில்லிகிராம்": "mg", "மில்லிலிட்டர்": "ml", "லிட்டர்": "l", "மீட்டர்": "m",
+
+    # Telugu
+    "గ్రాము": "g", "గ్రాం": "g",
+    "కిలోగ్రాము": "kg", "కిలో": "kg",
+    "మిల్లీగ్రాము": "mg", "మిల్లీలీటరు": "ml", "లీటరు": "l", "మీటరు": "m",
+
+    # Kannada
+    "ಗ್ರಾಂ": "g", "ಗ್ರಾಮ್": "g",
+    "ಕಿಲೋಗ್ರಾಂ": "kg", "ಕಿಲೋ": "kg",
+    "ಮಿಲಿಗ್ರಾಂ": "mg", "ಮಿಲಿಲೀಟರ್": "ml", "ಲೀಟರ್": "l", "ಮೀಟರ್": "m",
+
+    # Malayalam
+    "ഗ്രാം": "g", "കിലോഗ്രാം": "kg", "കിലോ": "kg",
+    "മില്ലിഗ്രാം": "mg", "മില്ലിലിറ്റർ": "ml", "ലിറ്റർ": "l", "മീറ്റർ": "m",
+
+    # Odia
+    "ଗ୍ରାମ": "g", "କିଲୋଗ୍ରାମ": "kg", "କିଲୋ": "kg",
+    "ମିଲିଗ୍ରାମ": "mg", "ମିଲିଲିଟର": "ml", "ଲିଟର": "l", "ମିଟର": "m",
+
+    # Urdu
+    "گرام": "g", "کلوگرام": "kg", "کلو": "kg",
+    "ملیگرام": "mg", "ملیلیٹر": "ml", "لیٹر": "l", "میٹر": "m",
+}
+
+UNIT_ALIASES.update(INDIC_UNIT_ALIASES)
+
 # Explicitly prohibited (non-standard) units under Rule 13(4).
+#
+# The regional spellings matter as much as the English ones: without them a pack
+# declaring "1 दर्जन" is merely unrecognised, so it fails Rule 6(1)(c) instead of
+# Rule 13(4) -- flagged either way, but the notice would cite the wrong rule.
+#
+# Note the existing distinction, kept as-is: a plain count ("Nos.", "नग") is a
+# standard declaration, while "pieces" is prohibited. The regional words follow
+# whichever English term they translate.
 NON_STANDARD_UNITS = {
     "dozen", "dozens", "doz",
     "score", "scores",
     "gross", "grosses",
     "piece", "pieces", "pcs", "pc",
+
+    # "dozen"
+    "दर्जन", "ডজন", "ડઝન", "ਦਰਜਨ",
+    "டஜன்", "డజను", "డజన్", "ಡಜನ್", "ഡസൻ", "ଡଜନ", "درجن",
+
+    # "piece"
+    "पीस", "टुकड़ा", "টুকরা", "ટુકડો", "ਟੁਕੜਾ", "துண்டு", "ముక్క", "ತುಂಡು", "കഷണം", "ଖଣ୍ଡ",
 }
 
 
@@ -64,8 +151,18 @@ def _text(value) -> bool:
 
 
 def _canonical_unit(unit: str) -> str:
-    """Lowercase, trim, drop a trailing period, and apply spelling aliases."""
-    u = (unit or "").strip().lower().rstrip(".")
+    """Reduce a printed unit to one canonical spelling, then apply aliases.
+
+    Removes the punctuation and spacing that packs vary freely ("g." / "मि. ली."
+    / "ملی لیٹر"), so one dictionary entry covers every way a unit is written.
+
+    The NFC step matters for Indian scripts specifically: the same word can
+    arrive from the extractor in two different byte sequences that look
+    identical, and only one of them would match a dictionary key.
+    """
+    u = unicodedata.normalize("NFC", unit or "").strip().lower()
+    u = u.replace(".", "")
+    u = "".join(u.split())        # drop spacing inside the unit, not just around it
     return UNIT_ALIASES.get(u, u)
 
 
