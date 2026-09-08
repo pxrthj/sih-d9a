@@ -126,6 +126,8 @@ class SupabaseService:
         latitude: Optional[float] = None,
         longitude: Optional[float] = None,
         location_accuracy: Optional[float] = None,
+        extracted_original: Optional[Dict[str, Any]] = None,
+        corrected_fields: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Insert a row into the Supabase 'scans' table.
@@ -136,7 +138,7 @@ class SupabaseService:
         older readers keep working.
 
         Optional columns (front_path, back_path, advisories, category, latitude,
-        longitude, location_accuracy) may not exist in a project whose schema.sql
+        longitude, location_accuracy, extracted_original, corrected_fields) may not exist in a project whose schema.sql
         has not been re-run; each missing column is dropped and the insert retried,
         so the rest of the record still saves.
 
@@ -170,6 +172,15 @@ class SupabaseService:
             optional_payload["longitude"] = longitude
         if location_accuracy is not None:
             optional_payload["location_accuracy"] = location_accuracy
+        # What the model read before the officer reviewed it, and which
+        # declarations they changed. Stored together: a corrected record that
+        # no longer shows what the photograph said has lost most of its value
+        # as evidence. An empty list is meaningful (reviewed, nothing changed)
+        # and is written, unlike None (never went through review at all).
+        if extracted_original is not None:
+            optional_payload["extracted_original"] = extracted_original
+        if corrected_fields is not None:
+            optional_payload["corrected_fields"] = corrected_fields
 
         logger.info(
             f"Saving scan record with {len(image_paths)} image(s) and status='{status}'"

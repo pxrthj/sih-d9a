@@ -1,5 +1,12 @@
 import { supabase, EVIDENCE_BUCKET } from './supabase'
-import type { CaptureCoords, ScanResponse, Verification } from './types'
+import type {
+  CaptureCoords,
+  ExtractResponse,
+  ExtractedData,
+  ExtractionSeal,
+  ScanResponse,
+  Verification,
+} from './types'
 
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
@@ -80,16 +87,54 @@ export async function fetchEvidenceUrls(scanId: string | number): Promise<string
   return [body.front, body.back].filter((u): u is string => !!u)
 }
 
+/** Pull the backend's message out of a failed response, else a status line. */
+async function failureDetail(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json()
+    if (body?.detail) {
+      return typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
+    }
+  } catch {
+    // response body was not JSON; keep the caller's message
+  }
+  return `${fallback} (HTTP ${res.status})`
+}
+
 /**
- * Calls the backend scan pipeline. The backend fetches every image from
- * storage, runs Gemini extraction + the rule engine, persists the record
- * (owned by user_id), and returns the extraction, violations and advisories.
+ * Reads the package and checks it, WITHOUT saving anything.
+ *
+ * The first half of a scan: the officer reviews what came back and corrects it
+ * before committing. The returned seal must be handed to commitScan unchanged —
+ * it is the server's proof of what the model read, and the record cannot show a
+ * correction without it.
  */
-export async function createScan(params: {
+export async function extractScan(params: {
   imagePaths: string[]
-  userId: string
   category: string
-  /** Capture location, when the device provided one. Omitted otherwise. */
+}): Promise<ExtractResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/scans/extract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify({ image_paths: params.imagePaths, category: params.category }),
+  })
+  if (!res.ok) throw new Error(await failureDetail(res, 'Could not read the package'))
+  return (await res.json()) as ExtractResponse
+}
+
+/**
+ * Saves the inspection record, once and permanently.
+ *
+ * `extracted` is what the officer confirmed; `original` and `seal` are the
+ * server's own reading and its signature, passed back untouched. The backend
+ * re-runs the compliance rules over the confirmed values — the verdict is never
+ * sent from here.
+ */
+export async function commitScan(params: {
+  imagePaths: string[]
+  category: string
+  extracted: ExtractedData
+  original: ExtractedData
+  seal: ExtractionSeal
   coords?: CaptureCoords | null
 }): Promise<ScanResponse> {
   const res = await fetch(`${API_BASE_URL}/api/scans`, {
@@ -97,9 +142,10 @@ export async function createScan(params: {
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({
       image_paths: params.imagePaths,
-      user_id: params.userId,
       category: params.category,
-      // Only sent when a fix was obtained; the backend treats all three as optional.
+      extracted: params.extracted,
+      extracted_original: params.original,
+      seal: params.seal,
       ...(params.coords && {
         latitude: params.coords.latitude,
         longitude: params.coords.longitude,
@@ -107,18 +153,7 @@ export async function createScan(params: {
       }),
     }),
   })
-
-  if (!res.ok) {
-    let detail = `Scan failed (HTTP ${res.status})`
-    try {
-      const body = await res.json()
-      if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
-    } catch {
-      // response body was not JSON; keep the generic message
-    }
-    throw new Error(detail)
-  }
-
+  if (!res.ok) throw new Error(await failureDetail(res, 'Could not save the record'))
   return (await res.json()) as ScanResponse
 }
 

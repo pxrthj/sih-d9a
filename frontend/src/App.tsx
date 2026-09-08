@@ -13,6 +13,8 @@ import History from './screens/History'
 import ScanDetail from './screens/ScanDetail'
 import Profile from './screens/Profile'
 import Users from './screens/Users'
+import RepeatOffenders from './screens/RepeatOffenders'
+import ReviewExtraction from './screens/ReviewExtraction'
 import Verify from './screens/Verify'
 
 // Split out: the map pulls in Leaflet, ~45 kB gzipped, for a screen only the
@@ -61,9 +63,13 @@ export default function App() {
             even on direct-URL access. */}
         <Route path="/scan" element={isAdmin ? <Navigate to="/" replace /> : <NewScan />} />
         <Route path="/results" element={isAdmin ? <Navigate to="/" replace /> : <Results />} />
+        {/* Review sits between extraction and the saved record, so it is
+            officer-only for the same reason scanning is. */}
+        <Route path="/review" element={isAdmin ? <Navigate to="/" replace /> : <ReviewExtraction />} />
         <Route path="/history" element={<History />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/users" element={<Users />} />
+        <Route path="/offenders" element={<RepeatOffenders />} />
         {/* Linked only from the admin console, but left reachable for officers:
             RLS scopes the rows either way, so an officer sees their own work. */}
         <Route

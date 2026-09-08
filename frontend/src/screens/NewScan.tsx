@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { createScan, uploadEvidencePhoto } from '../lib/api'
+import { extractScan, uploadEvidencePhoto } from '../lib/api'
 import { MAX_LABEL_IMAGES, type CaptureCoords } from '../lib/types'
 import { Banner } from '../components/ui'
 import { CameraIcon, MapPinIcon, ScanIcon } from '../components/Icons'
@@ -223,10 +223,12 @@ export default function NewScan() {
       // Use a fix we already have, else make one last attempt. Never blocks.
       const location = coords ?? (await captureLocation())
 
-      setStage('Extracting declarations & checking rules…')
-      const result = await createScan({ imagePaths, userId: user.id, category, coords: location })
+      setStage('Reading declarations & checking rules…')
+      const result = await extractScan({ imagePaths, category })
 
-      navigate('/results', { state: { result, coords: location } })
+      // Nothing is saved yet. The officer reviews the reading, corrects what
+      // the model got wrong, and the record is written on the next screen.
+      navigate('/review', { state: { result, imagePaths, category, coords: location } })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Scan failed. Please try again.')
       setSubmitting(false)

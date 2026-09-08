@@ -90,11 +90,15 @@ export function Banner({
   kind = 'info',
   children,
 }: {
-  kind?: 'info' | 'error' | 'success'
+  kind?: 'info' | 'error' | 'success' | 'warning'
   children: ReactNode
 }) {
   const icon =
-    kind === 'error' ? <AlertIcon size={18} /> : kind === 'success' ? <CheckIcon size={18} /> : null
+    kind === 'error' || kind === 'warning' ? (
+      <AlertIcon size={18} />
+    ) : kind === 'success' ? (
+      <CheckIcon size={18} />
+    ) : null
   return (
     <div className={`banner banner--${kind}`}>
       {icon}

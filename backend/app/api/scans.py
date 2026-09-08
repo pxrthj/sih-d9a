@@ -4,7 +4,16 @@ from collections import defaultdict
 from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
-from app.schemas.scan import MAX_LABEL_IMAGES, ScanRequest, ScanResponse
+from app.schemas.scan import (
+    MAX_LABEL_IMAGES,
+    ExtractedData,
+    ExtractionSeal,
+    ExtractRequest,
+    ExtractResponse,
+    ScanRequest,
+    ScanResponse,
+)
+from app.services.extraction_seal import seal_extraction, verify_extraction
 from app.services.supabase_service import SupabaseService
 from app.services.gemini_service import GeminiService
 from app.services.report_service import _fmt_dt, _notice_ref, generate_notice_pdf, notice_filename
@@ -127,47 +136,10 @@ def _enforce_scan_rate_limit(user_id: str) -> None:
         )
 
 
-@router.post(
-    "",
-    response_model=ScanResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Process a multi-photo product label scan",
-    description=(
-        f"Fetches 1 to {MAX_LABEL_IMAGES} label photos from Supabase Storage 'evidence-photos', extracts "
-        "Legal Metrology declarations from all of them in a single call to the configured Gemini model "
-        "with structured output, applies the compliance rules, persists the result into the Supabase "
-        "'scans' table, and returns the extracted data, violations and advisories."
-    ),
-)
-@router.post("/", response_model=ScanResponse, include_in_schema=False)
-def create_scan(
-    payload: ScanRequest,
-    current_user: Dict[str, Optional[str]] = Depends(get_current_user),
-    supabase_service: SupabaseService = Depends(get_supabase_service),
-    gemini_service: GeminiService = Depends(get_gemini_service),
-) -> ScanResponse:
-    # Owner is derived from the authenticated token, NOT the request body -- a
-    # client cannot attribute a scan to another user.
-    user_id = current_user["id"]
-    _enforce_scan_rate_limit(user_id)
-
-    image_paths = payload.resolved_paths()
-    category = payload.category.strip() if payload.category else None
-
-    if not image_paths:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="At least one label photo is required.",
-        )
-    if len(image_paths) > MAX_LABEL_IMAGES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"At most {MAX_LABEL_IMAGES} label photos can be scanned at once.",
-        )
-
-    logger.info(f"Received scan request with {len(image_paths)} image(s): {image_paths}")
-
-    # 1. Fetch every image from Supabase Storage, in the order captured.
+def _load_images(
+    image_paths: List[str], supabase_service: SupabaseService
+) -> List[Tuple[bytes, str]]:
+    """Fetch every evidence photo from storage, in the order it was captured."""
     images: List[Tuple[bytes, str]] = []
     for index, path in enumerate(image_paths, start=1):
         try:
@@ -185,8 +157,62 @@ def create_scan(
                 detail=f"Failed to retrieve photo {index} from storage.",
             )
         images.append((image_bytes, supabase_service.get_mime_type(path)))
+    return images
 
-    # 2. Extract declarations from every image via the Gemini API in a SINGLE call
+
+def _validate_paths(image_paths: List[str]) -> None:
+    if not image_paths:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one label photo is required.",
+        )
+    if len(image_paths) > MAX_LABEL_IMAGES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"At most {MAX_LABEL_IMAGES} label photos can be scanned at once.",
+        )
+
+
+def _corrected_fields(original: ExtractedData, reviewed: ExtractedData) -> List[str]:
+    """Which declarations the officer changed, comparing field by field.
+
+    Top-level fields only, which is the granularity an officer edits and the
+    granularity the notice reports. Sorted so the record reads the same way
+    every time it is regenerated.
+    """
+    before = original.model_dump()
+    after = reviewed.model_dump()
+    return sorted(key for key in after if before.get(key) != after.get(key))
+
+
+@router.post(
+    "/extract",
+    response_model=ExtractResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Read a package and check it, without writing anything down",
+    description=(
+        "Runs extraction and the compliance rules over 1 to 4 label photos and returns the "
+        "result for the officer to review. Nothing is persisted. The response carries a seal "
+        "over the model's reading; POST /api/scans requires it back, which is what lets a "
+        "saved record prove which declarations the officer corrected."
+    ),
+)
+def extract_scan(
+    payload: ExtractRequest,
+    current_user: Dict[str, Optional[str]] = Depends(get_current_user),
+    supabase_service: SupabaseService = Depends(get_supabase_service),
+    gemini_service: GeminiService = Depends(get_gemini_service),
+    settings: Settings = Depends(get_settings),
+) -> ExtractResponse:
+    user_id = current_user["id"]
+    _enforce_scan_rate_limit(user_id)
+
+    image_paths = [p.strip() for p in (payload.image_paths or []) if p and p.strip()]
+    _validate_paths(image_paths)
+
+    logger.info(f"Extraction request with {len(image_paths)} image(s): {image_paths}")
+    images = _load_images(image_paths, supabase_service)
+
     try:
         extracted = gemini_service.extract_label_data(images=images)
     except Exception as exc:
@@ -196,17 +222,101 @@ def create_scan(
             detail="Label extraction is temporarily unavailable. Please try again.",
         )
 
-    # 3. Run the deterministic Legal Metrology Rule 6 checks. Category is passed
-    #    through so future per-category rules can hook in; today every category
-    #    runs the exact same 8 checks.
+    category = payload.category.strip() if payload.category else None
     violations, compliance_status = check_compliance_rules(extracted, category=category)
-
-    # 3b. Advisories are observations only -- they never change the status.
     advisories = build_advisories(extracted, image_count=len(images))
 
-    # 4. Save record to Supabase 'scans' table
+    return ExtractResponse(
+        extracted=extracted,
+        violations=violations,
+        advisories=advisories,
+        status=compliance_status,
+        seal=ExtractionSeal(
+            **seal_extraction(extracted.model_dump(), settings.SUPABASE_SERVICE_ROLE_KEY)
+        ),
+    )
+
+
+@router.post(
+    "",
+    response_model=ScanResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Save an inspection record",
+    description=(
+        "Writes one permanent record. Given a reviewed extraction (from POST /api/scans/extract) "
+        "it verifies the seal on the model's original reading, re-runs the compliance rules over "
+        "what the officer confirmed, and stores both readings plus the list of corrected fields. "
+        "Given no extraction it performs the original one-shot scan instead, so an older frontend "
+        "keeps working during a deploy."
+    ),
+)
+@router.post("/", response_model=ScanResponse, include_in_schema=False)
+def create_scan(
+    payload: ScanRequest,
+    current_user: Dict[str, Optional[str]] = Depends(get_current_user),
+    supabase_service: SupabaseService = Depends(get_supabase_service),
+    gemini_service: GeminiService = Depends(get_gemini_service),
+    settings: Settings = Depends(get_settings),
+) -> ScanResponse:
+    # Owner is derived from the authenticated token, NOT the request body -- a
+    # client cannot attribute a scan to another user.
+    user_id = current_user["id"]
+    _enforce_scan_rate_limit(user_id)
+
+    image_paths = payload.resolved_paths()
+    category = payload.category.strip() if payload.category else None
+    _validate_paths(image_paths)
+
+    if payload.is_reviewed():
+        # --- Commit of a reviewed extraction -------------------------------
+        # The officer may have corrected what the model read. Two things keep
+        # that honest: the original reading has to carry this server's seal, so
+        # it cannot be invented to hide an edit; and the verdict below is
+        # recomputed here rather than accepted from the client.
+        if payload.extracted_original is None or payload.seal is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="A reviewed scan must include the original extraction and its seal.",
+            )
+
+        ok, reason = verify_extraction(
+            payload.extracted_original.model_dump(),
+            payload.seal.model_dump(),
+            settings.SUPABASE_SERVICE_ROLE_KEY,
+        )
+        if not ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
+
+        extracted = payload.extracted
+        original = payload.extracted_original
+        corrected = _corrected_fields(original, extracted)
+        image_count = len(image_paths)
+        if corrected:
+            logger.info(f"Officer corrected {len(corrected)} field(s): {', '.join(corrected)}")
+    else:
+        # --- Legacy one-shot scan ------------------------------------------
+        logger.info(f"One-shot scan request with {len(image_paths)} image(s): {image_paths}")
+        images = _load_images(image_paths, supabase_service)
+        try:
+            extracted = gemini_service.extract_label_data(images=images)
+        except Exception as exc:
+            logger.error(f"Gemini API extraction failed: {exc}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Label extraction is temporarily unavailable. Please try again.",
+            )
+        original = extracted
+        corrected = []
+        image_count = len(images)
+
+    # The deterministic Legal Metrology checks, over whatever is about to be
+    # written down. Category is passed through so future per-category rules can
+    # hook in; today every category runs the exact same 8 checks.
+    violations, compliance_status = check_compliance_rules(extracted, category=category)
+    advisories = build_advisories(extracted, image_count=image_count)
+
     try:
-        supabase_service.save_scan_record(
+        saved = supabase_service.save_scan_record(
             image_paths=image_paths,
             extracted=extracted.model_dump(),
             violations=[v.model_dump() for v in violations],
@@ -220,6 +330,11 @@ def create_scan(
             latitude=payload.latitude,
             longitude=payload.longitude,
             location_accuracy=payload.location_accuracy,
+            # What the model read, kept alongside what was confirmed. Without
+            # both, a corrected record can no longer show what the photograph
+            # actually said, which is most of its value as evidence.
+            extracted_original=original.model_dump(),
+            corrected_fields=corrected,
         )
     except Exception as exc:
         logger.error(f"Failed to write record to Supabase 'scans' table: {exc}")
@@ -228,12 +343,13 @@ def create_scan(
             detail="Failed to save the inspection record.",
         )
 
-    # 5. Return extracted data, violations and advisories
     return ScanResponse(
         extracted=extracted,
         violations=violations,
         advisories=advisories,
         status=compliance_status,
+        id=str(saved.get("id")) if isinstance(saved, dict) and saved.get("id") else None,
+        corrected_fields=corrected,
     )
 
 

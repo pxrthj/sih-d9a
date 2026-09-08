@@ -55,6 +55,32 @@ export interface ScanResponse {
   violations: Violation[]
   advisories?: Advisory[]
   status: string | null
+  /** Id of the saved record, when the backend reported one. */
+  id?: string | null
+  /** Declarations the officer changed before committing. */
+  corrected_fields?: string[]
+}
+
+/**
+ * The server's signature over what the model read.
+ *
+ * Opaque to the client: hold it and hand it back on commit. It is what lets a
+ * saved record show which declarations the officer corrected without the
+ * client being able to author the "original" itself.
+ */
+export interface ExtractionSeal {
+  issued_at: number
+  signature: string
+}
+
+/** A reading awaiting the officer's review. Nothing is saved at this point. */
+export interface ExtractResponse {
+  extracted: ExtractedData
+  violations: Violation[]
+  advisories?: Advisory[]
+  /** Provisional — the recorded verdict is recomputed from what is confirmed. */
+  status: string | null
+  seal: ExtractionSeal
 }
 
 /** Maximum label photos per scan; the backend enforces the same limit. */
@@ -105,6 +131,23 @@ export interface CaptureCoords {
 
 export type Role = 'admin' | 'officer' | 'none'
 export type ProfileStatus = 'active' | 'inactive'
+
+/**
+ * One packer's inspection history, from the manufacturer_offences view.
+ *
+ * Identity is derived from the printed name at query time, so it is a best
+ * effort: the same firm can still split across spellings the normaliser has not
+ * been taught, and two unrelated firms sharing a trading name merge. Present it
+ * as a lead worth following, never as a count of proven offences.
+ */
+export interface ManufacturerOffence {
+  manufacturer_key: string
+  manufacturer_name: string | null
+  scan_count: number
+  flagged_count: number
+  first_seen?: string | null
+  last_seen?: string | null
+}
 
 // A row from the Supabase "profiles" table.
 export interface Profile {

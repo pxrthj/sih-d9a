@@ -101,6 +101,12 @@ class ExtractedData(BaseModel):
     )
 
 
+class ExtractionSeal(BaseModel):
+    """The server's signature over a model reading. See services/extraction_seal."""
+    issued_at: int = Field(description="Unix seconds when the extraction was sealed")
+    signature: str = Field(description="HMAC over the extraction and its timestamp")
+
+
 class ScanRequest(BaseModel):
     image_paths: List[str] = Field(
         default_factory=list,
@@ -144,6 +150,34 @@ class ScanRequest(BaseModel):
         examples=[12.5],
     )
 
+    # --- The reviewed extraction, when the officer went through the new flow ---
+    #
+    # All three arrive together or not at all. When they are absent the request
+    # is the original one-shot scan (extract and save in a single call), which
+    # is kept working so a frontend deploy can lag the backend without taking
+    # scanning down -- the same reason the legacy front/back fields above still
+    # exist. A record written that way simply has no corrections.
+    #
+    # There is deliberately no `status` or `violations` field here. The verdict
+    # is re-derived server-side from `extracted`, because a client able to post
+    # its own compliance status could clear a package by asking nicely.
+    extracted: Optional[ExtractedData] = Field(
+        default=None,
+        description="The reviewed declarations, as the officer confirmed them",
+    )
+    extracted_original: Optional[ExtractedData] = Field(
+        default=None,
+        description="The model's own reading, exactly as this server returned it",
+    )
+    seal: Optional[ExtractionSeal] = Field(
+        default=None,
+        description="The seal this server issued over extracted_original",
+    )
+
+    def is_reviewed(self) -> bool:
+        """True when this is a commit of a reviewed extraction."""
+        return self.extracted is not None
+
     def resolved_paths(self) -> List[str]:
         """The photo paths for this request, trimmed and de-blanked.
 
@@ -154,6 +188,15 @@ class ScanRequest(BaseModel):
             return paths
         legacy = [self.front_path, self.back_path]
         return [p.strip() for p in legacy if p and p.strip()]
+
+
+class ExtractRequest(BaseModel):
+    """Read a package, decide nothing, store nothing."""
+    image_paths: List[str] = Field(
+        default_factory=list,
+        description=f"1 to {MAX_LABEL_IMAGES} photo paths in the 'evidence-photos' bucket",
+    )
+    category: Optional[str] = Field(default=None, description="Product category, if the officer set one")
 
 
 class Violation(BaseModel):
@@ -175,6 +218,20 @@ class Advisory(BaseModel):
     rule_ref: str
 
 
+class ExtractResponse(BaseModel):
+    """What the officer reviews. Nothing here has been written down yet.
+
+    The verdict is included so the officer can see where the package stands
+    before correcting anything, but it is provisional: the recorded verdict is
+    recomputed on commit from whatever they confirm.
+    """
+    extracted: ExtractedData
+    violations: List[Violation]
+    advisories: List[Advisory] = Field(default_factory=list)
+    status: Optional[str] = Field(default=None, description="Provisional; recomputed on commit")
+    seal: ExtractionSeal
+
+
 class ScanResponse(BaseModel):
     extracted: ExtractedData
     violations: List[Violation]
@@ -185,4 +242,11 @@ class ScanResponse(BaseModel):
     status: Optional[str] = Field(
         default=None,
         description="Overall compliance status (e.g. 'compliant', 'flagged')"
+    )
+    id: Optional[str] = Field(
+        default=None, description="Id of the record that was written, when it was saved"
+    )
+    corrected_fields: List[str] = Field(
+        default_factory=list,
+        description="Declarations the officer changed before committing; empty when untouched",
     )

@@ -1131,3 +1131,139 @@ a {
   cursor: pointer;
   text-decoration: underline;
 }
+
+/* ============================================================
+   Repeat offenders table
+   ============================================================ */
+.mfr-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.mfr-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px 96px 132px 108px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--card-border);
+  font-size: 13.5px;
+}
+
+.mfr-row:first-child {
+  border-top: 0;
+}
+
+.mfr-row--head {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+  background: var(--surface-container-low);
+}
+
+/* Packer names are long and arrive from a photograph; keep the row height
+   stable rather than letting one address push the table around. */
+.mfr-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.mfr-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--on-surface-variant);
+}
+
+.mfr-num--flagged {
+  font-weight: 700;
+  color: var(--error);
+}
+
+.mfr-bar {
+  display: inline-block;
+  vertical-align: middle;
+  width: 74px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface-container-high);
+  overflow: hidden;
+}
+
+.mfr-bar__fill {
+  display: block;
+  height: 100%;
+  background: var(--error);
+}
+
+.mfr-share {
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--on-surface-variant);
+}
+
+/* ============================================================
+   Review-before-save
+   Corrections are marked as the officer makes them, so what they are about
+   to sign for is visible before they commit — the record is permanent.
+   ============================================================ */
+.edited-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.input--edited {
+  border-color: var(--warning);
+  background: color-mix(in srgb, var(--warning-bg) 45%, transparent);
+}
+
+.checkline {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.checkline input {
+  margin-top: 2px;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.linkback {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+}
+
+/* Warning banner — an amendment the officer should see before committing,
+   distinct from an error (something went wrong) and info (context). */
+.banner--warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+}

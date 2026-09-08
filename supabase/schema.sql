@@ -174,3 +174,111 @@ create policy evidence_upload_authenticated on storage.objects
 -- notice. The bucket therefore stays private with upload as its only client
 -- permission.
 drop policy if exists evidence_read_own_or_admin on storage.objects;
+
+-- ---------------------------------------------------------------------------
+-- 7. Repeat offenders — who has been flagged, how often, and how recently
+--
+-- This is a VIEW, not a column on "scans", and that is deliberate. Deriving the
+-- identity at read time means no new column, no backfill, and above all no
+-- UPDATE against inspection records -- the table has no update path by design,
+-- and a migration that rewrote every historical row to add a key would be the
+-- one thing the whole schema is built to make impossible. Change the rules
+-- below and every record, old and new, is regrouped on the next query.
+--
+-- security_invoker = on is load-bearing. Without it a view runs with its
+-- creator's rights and quietly bypasses row-level security, which would let any
+-- officer read every other officer's inspections through this view. With it,
+-- the policies on "scans" apply exactly as they do everywhere else: officers
+-- see their own work, admins see all of it.
+-- ---------------------------------------------------------------------------
+
+-- Reduces a printed packer name to one identity, so the same firm groups
+-- together across photographs.
+--
+-- The ladder, in order:
+--   1. take the part before the first comma -- packer strings read
+--      "Name, Address, City", and only the name identifies the firm;
+--   2. drop the role prefix. Packs say who the party IS as well as who they
+--      are: "Mfd. By:", "Marketed by", "Packed by". The extraction prompt's own
+--      worked example is 'Mfd. By: XYZ Ltd', so this is the common case, not an
+--      edge one -- without it the same firm splits into a group per prefix;
+--   3. drop the corporate suffixes, which appear inconsistently on the same
+--      pack across print runs ("Pvt. Ltd." / "Pvt Ltd" / "PRIVATE LIMITED");
+--   4. remove separators so spacing and punctuation stop mattering.
+--
+-- Step 4 deletes SEPARATORS rather than keeping only [:alnum:], and that
+-- distinction is load-bearing. A packer named in Devanagari or Tamil is making
+-- a lawful declaration, but vowel signs and viramas are combining marks, which
+-- [:alnum:] does not match -- keeping only alphanumerics would quietly strip
+-- शुभ फूड्स down to शभफडस, mangling the identity and risking collisions between
+-- firms whose names differ only in those marks. Removing spaces and punctuation
+-- leaves every script intact.
+create or replace function public.manufacturer_identity(packer text)
+returns text
+language sql
+immutable
+as $$
+  select nullif(
+    regexp_replace(
+      regexp_replace(
+        regexp_replace(
+          lower(split_part(coalesce(packer, ''), ',', 1)),
+          '^\s*(mfd|manufactured|mfg|mktd|marketed|packed|pkd|imported|impd|distributed)\.?\s*(by)?\.?\s*:?\s*',
+          '', 'g'
+        ),
+        -- Devanagari suffixes carry the same meaning as the English ones and
+        -- appear on the same packs: प्रा. लि. is Pvt. Ltd. Without them a firm
+        -- printing its name in Hindi splits from the same firm printing it in
+        -- English. NEEDS REVIEW by a native reader, and by the same reasoning
+        -- as the unit vocabulary: extend it per script rather than guess.
+        '(\s*\.?\s*(pvt|private|ltd|limited|llp|inc|corp|co|प्रा|प्राइवेट|लि|लिमिटेड|कंपनी)\.?)+\s*$', '', 'g'
+      ),
+      '[[:space:][:punct:]]+', '', 'g'
+    ),
+    ''
+  );
+$$;
+
+create or replace view public.manufacturer_offences
+with (security_invoker = on) as
+select
+  public.manufacturer_identity(extracted ->> 'manufacturer_packer_importer') as manufacturer_key,
+  -- The most recently read spelling, shown to a human. The key groups; this
+  -- names. Picking the newest keeps the display current as extraction improves.
+  (array_agg(
+    extracted ->> 'manufacturer_packer_importer' order by created_at desc
+  ))[1] as manufacturer_name,
+  count(*)                                                                  as scan_count,
+  count(*) filter (where lower(coalesce(status, '')) <> 'compliant')         as flagged_count,
+  min(created_at)                                                           as first_seen,
+  max(created_at)                                                           as last_seen
+from public.scans
+where public.manufacturer_identity(extracted ->> 'manufacturer_packer_importer') is not null
+group by 1;
+
+comment on view public.manufacturer_offences is
+  'Inspection history grouped by packer identity. Read-time derivation: no column on scans, no backfill, no update to an immutable record.';
+
+-- ---------------------------------------------------------------------------
+-- 8. The officer's review of the extraction
+--
+-- An officer now corrects what the model read BEFORE the record exists, rather
+-- than editing a record afterwards. That keeps rule 4 intact -- there is still
+-- no update path, and a row is still written exactly once -- while letting a
+-- misread MRP be fixed instead of standing as a false violation.
+--
+-- Both readings are kept. "extracted" is what the officer confirmed and what
+-- the verdict was computed from; "extracted_original" is what the model
+-- returned. A record that showed only the corrected values could no longer
+-- demonstrate what the photograph actually said, which is most of its worth as
+-- evidence, and would let a correction pass as a reading.
+--
+-- corrected_fields names the declarations that differ, so the notice can say
+-- so plainly rather than leaving a reader to diff two JSON blobs.
+--
+-- Both are null on records written before this existed, and on one-shot scans
+-- that never went through a review.
+-- ---------------------------------------------------------------------------
+alter table public.scans
+  add column if not exists extracted_original jsonb,
+  add column if not exists corrected_fields   text[];

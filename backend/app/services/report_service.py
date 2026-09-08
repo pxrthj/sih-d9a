@@ -109,6 +109,9 @@ NOTICE_HTML = """
     {% if location %}<tr><td class="k">Inspection location</td><td class="v">{{ location.coords }}<div class="sub">{{ location.maps_url }}</div></td></tr>{% endif %}
     <tr><td class="k">Inspecting officer</td><td class="v">{{ officer_name }}{% if officer_email %} &lt;{{ officer_email }}&gt;{% endif %}</td></tr>
     <tr><td class="k">Product category</td><td class="v">{{ category }}</td></tr>
+    {% if corrected_fields %}
+    <tr><td class="k">Corrected by officer</td><td class="v">{{ corrected_fields }}<div class="sub">These declarations were amended by the inspecting officer after extraction; the verdict was recomputed from the amended values.</div></td></tr>
+    {% endif %}
     <tr><td class="k">Addressed to (Mfr/Packer/Importer)</td><td class="v">{{ packer }}</td></tr>
     {% if product_name %}<tr><td class="k">Commodity</td><td class="v">{{ product_name }}</td></tr>{% endif %}
     {% if net_quantity %}<tr><td class="k">Declared net quantity</td><td class="v">{{ net_quantity }}</td></tr>{% endif %}
@@ -403,6 +406,11 @@ def generate_notice_pdf(
             photos.append({"uri": uri, "w": width, "h": height, "caption": f"Photo {index}"})
     photo_rows = [photos[i:i + 2] for i in range(0, len(photos), 2)]
 
+    # Declarations the officer changed before the record was written. Old
+    # records and one-shot scans have none, and the notice then says nothing.
+    corrected = scan.get("corrected_fields") or []
+    corrected_labels = ", ".join(_field_label(f) for f in corrected) if corrected else ""
+
     now = datetime.now(IST)
     context = {
         "notice_ref": _notice_ref(scan),
@@ -428,6 +436,10 @@ def generate_notice_pdf(
         "advisories": advisories,
         "photo_rows": photo_rows,
         "compliance_period": compliance_period,
+        # Named on the notice when the officer corrected the extraction. A
+        # document that quietly presented an edited reading as what the
+        # photograph showed would misrepresent its own evidence.
+        "corrected_fields": corrected_labels,
     }
 
     html = _template.render(**context)
