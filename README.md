@@ -38,11 +38,18 @@ the status.
 ```
   phone ──1── upload 1-4 photos ────────────────► Supabase Storage (private)
     │                                                      │
-    └──2── POST /api/scans + bearer token ──► FastAPI ──3──┘  fetch bytes (service-role)
+    └──2── POST /api/scans/extract ─────────► FastAPI ──3──┘  fetch bytes (service-role)
                                                  │
                                                  ├──4── one call, all images ──► Gemini
                                                  ├──5── 8 deterministic rules  (Python)
-                                                 └──6── insert immutable row ──► Postgres
+                                                 └──6── return + SEAL the reading (nothing saved)
+    │
+    └──7── officer reviews, corrects a misread field
+    │
+    └──8── POST /api/scans ─────────────────► FastAPI
+                                                 ├──9── verify the seal on the original
+                                                 ├─10── re-run the rules on what was confirmed
+                                                 └─11── insert immutable row ──► Postgres
 ```
 
 Reads bypass the API entirely: the app queries Postgres directly and **row-level security**, not
@@ -55,11 +62,12 @@ application code, decides what comes back.
 | Data | Supabase (Postgres, Auth, Storage) | Records, Google sign-in, private evidence bucket, RLS |
 | Extraction | Gemini 3.5 Flash | Photographs → one schema-validated JSON object |
 
-The API is deliberately five endpoints wide, and only one of them writes:
+The API is deliberately six endpoints wide, and only one of them writes:
 
 | Endpoint | Purpose |
 | --- | --- |
-| `POST /api/scans` | Run the pipeline; returns extraction, violations, advisories, status |
+| `POST /api/scans/extract` | Read and check a package; returns the extraction for review. Writes nothing |
+| `POST /api/scans` | Save the reviewed record; re-runs the rules over what the officer confirmed |
 | `GET /api/scans/{id}/evidence` | Short-lived signed URLs for the evidence photos |
 | `GET /api/scans/{id}/notice` | Render the Improvement Notice PDF |
 | `GET /api/scans/{id}/verify` | **Public.** Verdict for a printed notice, so it can be checked against the record |
