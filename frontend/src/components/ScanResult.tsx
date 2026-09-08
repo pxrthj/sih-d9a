@@ -76,10 +76,20 @@ export function VerdictBanner({
   )
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+function Field({
+  label,
+  value,
+  wide = false,
+}: {
+  label: string
+  value: string | null | undefined
+  /** Span the whole row — for free text (an address, a care line) that reads
+      badly wrapped into half a column. */
+  wide?: boolean
+}) {
   const empty = value === null || value === undefined || value.trim?.() === ''
   return (
-    <div className="field">
+    <div className={`field ${wide ? 'field--wide' : ''}`}>
       <div className="field__label">{label}</div>
       <div className={`field__value ${empty ? 'field__value--empty' : ''}`}>
         {empty ? 'Not detected on label' : value}
@@ -98,10 +108,27 @@ export function ExtractedFields({ extracted }: { extracted: ExtractedData | null
   const taxStated = extracted.mrp?.inclusive_of_taxes_stated
 
   return (
-    <div className="card">
+    /* A grid, not a column of nine rows. On a wide record the flat list ran
+       well past a screen and the reader lost the shape of the declaration;
+       paired fields halve that. The long free-text ones still span, because
+       an address wrapped into half a column is worse than a full-width line.
+
+       Order follows the pack: what it is and who made it, then the block of
+       small print — MRP, dates and batch — that the extractor hunts for
+       together and that packs usually print together. */
+    <div className="card fieldgrid">
+      {/* Five short fields would leave one stranded in a half-empty row, so
+          the product name joins the pairs and the packer's address — the one
+          genuinely long value — takes its own line between them. */}
       <Field label="Product Name" value={extracted.product_name} />
-      <Field label="Manufacturer / Packer / Importer" value={extracted.manufacturer_packer_importer} />
       <Field label="Net Quantity" value={nq} />
+
+      <Field
+        label="Manufacturer / Packer / Importer"
+        value={extracted.manufacturer_packer_importer}
+        wide
+      />
+
       <div className="field">
         <div className="field__label">Maximum Retail Price (MRP)</div>
         <div className={`field__value ${!mrp ? 'field__value--empty' : ''}`}>
@@ -120,10 +147,13 @@ export function ExtractedFields({ extracted }: { extracted: ExtractedData | null
         </div>
       </div>
       <Field label="Mfg / Pack Date" value={extracted.mfg_or_pack_date} />
+
       <Field label="Use By / Best Before" value={extracted.use_by_date} />
       <Field label="Lot / Batch Number" value={extracted.lot_batch_number} />
-      <Field label="Consumer Care" value={extracted.consumer_care} />
-      <div className="field">
+
+      <Field label="Consumer Care" value={extracted.consumer_care} wide />
+
+      <div className="field field--wide">
         <div className="field__label">Declarations Present</div>
         <div className="field__value">
           {extracted.declarations_present && extracted.declarations_present.length > 0 ? (
