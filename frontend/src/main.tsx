@@ -5,6 +5,9 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './auth/AuthContext'
 import DatabaseBadge from './components/DatabaseBadge'
+import { applyTheme, readThemePref } from './lib/theme'
+
+applyTheme(readThemePref())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

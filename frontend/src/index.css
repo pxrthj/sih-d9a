@@ -1,42 +1,63 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 /* ============================================================
-   ParakhMitra — Compliance Authority Grid design system
-   Tokens derived from DESIGN.md (navy institutional palette).
+   ParakhMitra design system
+
+   Two themes from one set of names. Every colour below is declared on
+   :root in its light value, then redefined -- and ONLY redefined -- in the
+   two dark blocks that follow. Components must read these variables and
+   never a literal, or they render one theme's ink on the other's paper.
+
+   Theme resolution, in order:
+     :root                       light, and the value every token falls back to
+     @media (prefers-color-scheme: dark), guarded by :not([data-theme="light"])
+                                 the OS preference, unless the user chose light
+     :root[data-theme="dark"]    the user's explicit choice, which wins outright
    ============================================================ */
 :root {
-  /* Surfaces */
-  --surface: #f7f9fb;
-  --background: #f7f9fb;
+  color-scheme: light;
+
+  /* Surfaces. The console floats as a card on --background, which is why the
+     page ground is tinted rather than white. */
+  --background: #e9edfb;
+  --surface: #ffffff;
   --surface-container-lowest: #ffffff;
-  --surface-container-low: #f2f4f6;
-  --surface-container: #eceef0;
-  --surface-container-high: #e6e8ea;
+  --surface-container-low: #f5f7fc;
+  --surface-container: #eef1f8;
+  --surface-container-high: #e4e9f4;
 
   /* Text */
-  --on-surface: #191c1e;
-  --on-surface-variant: #43474e;
-  --outline: #74777f;
-  --outline-variant: #c4c6cf;
-  --card-border: #e2e8f0;
+  --on-surface: #1a1f36;
+  --on-surface-variant: #6b7691;
+  --outline: #8a94a6;
+  --outline-variant: #ccd3e2;
+  --card-border: #e7ebf4;
 
-  /* Brand — navy + royal blue */
-  --primary: #1a365d;
-  --primary-deep: #002045;
+  /* Brand */
+  --primary: #2f5fd8;
+  --primary-deep: #26479f;
+  --primary-soft: #eef3fe;
   --on-primary: #ffffff;
-  --primary-container: #1a365d;
-  --secondary: #1960a3;
-  --royal: #2b6cb0;
+  /* Text on --primary-deep. Separate from --on-primary because in dark the
+     button fill is light (needing dark text) while the app bar stays dark
+     (needing light text) -- one token cannot be both. */
+  --on-primary-deep: #ffffff;
+  --primary-hover: #244bb0;
+  --on-error: #ffffff;
+  --primary-container: #3d6fe5;
+  --secondary: #3d6fe5;
+  --royal: #3d6fe5;
 
-  /* Status / compliance semantics */
-  --success: #166534;
-  --success-bg: #dcfce7;
-  --success-on: #14532d;
-  --warning: #b45309;
-  --warning-bg: #fef3c7;
-  --error: #991b1b;
-  --error-bg: #fee2e2;
-  --error-on: #7f1d1d;
+  /* Compliance semantics. Deliberately separate from the brand blue: a
+     verdict must never be mistaken for a link or a selected tab. */
+  --success: #1f9d63;
+  --success-bg: #e3f7ed;
+  --success-on: #11623d;
+  --warning: #b9751a;
+  --warning-bg: #fdf1dd;
+  --error: #d94f52;
+  --error-bg: #fdeaea;
+  --error-on: #8f2f31;
 
   /* Accents */
   --institutional-accent: #b02a30;
@@ -46,19 +67,106 @@
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
+  --radius-xl: 1.25rem;
   --radius-full: 9999px;
 
-  /* Elevation */
-  --shadow-card: 0px 4px 6px -1px rgba(0, 0, 0, 0.05), 0px 2px 4px -1px rgba(0, 0, 0, 0.03);
-  --shadow-nav: 0 -1px 12px rgba(0, 32, 69, 0.08);
+  /* Elevation. Soft and wide rather than tight and dark -- the console reads
+     as a sheet lifted off the page, not a series of stacked boxes. */
+  --shadow-card: 0 1px 2px rgba(26, 31, 54, 0.04), 0 8px 24px rgba(26, 31, 54, 0.05);
+  --shadow-nav: 0 -1px 12px rgba(26, 31, 54, 0.07);
+  --shadow-float: 0 4px 40px rgba(26, 31, 54, 0.09);
 
   /* Layout */
   --app-max-width: 460px;
   --nav-height: 68px;
   --page-margin: 20px;
+}
 
-  color-scheme: light;
+/* The OS preference, unless the reader has explicitly asked for light. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --background: #0d111c;
+    --surface: #161c2b;
+    --surface-container-lowest: #161c2b;
+    --surface-container-low: #1c2333;
+    --surface-container: #222a3d;
+    --surface-container-high: #2a3349;
+
+    --on-surface: #e8ebf3;
+    --on-surface-variant: #98a3bb;
+    --outline: #7a86a0;
+    --outline-variant: #39425a;
+    --card-border: #262f43;
+
+    --primary: #7ba2f5;
+    --primary-deep: #1b2440;
+    --primary-soft: #1d2740;
+    --on-primary: #0d111c;
+    --on-primary-deep: #e8ebf3;
+  --primary-hover: #a8c2f8;
+  --on-error: #2a0f10;
+    --primary-hover: #a8c2f8;
+    --on-error: #2a0f10;
+    --primary-container: #7ba2f5;
+    --secondary: #7ba2f5;
+    --royal: #7ba2f5;
+
+    /* Lifted so they still carry on a dark ground; the light values go muddy. */
+    --success: #4ecb92;
+    --success-bg: #14301f;
+    --success-on: #9fe6c3;
+    --warning: #e0a44f;
+    --warning-bg: #33260f;
+    --error: #f0797c;
+    --error-bg: #38191b;
+    --error-on: #f7b3b5;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+    --shadow-nav: 0 -1px 12px rgba(0, 0, 0, 0.4);
+    --shadow-float: 0 4px 40px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* The explicit choice, which beats the OS in either direction. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #0d111c;
+  --surface: #161c2b;
+  --surface-container-lowest: #161c2b;
+  --surface-container-low: #1c2333;
+  --surface-container: #222a3d;
+  --surface-container-high: #2a3349;
+
+  --on-surface: #e8ebf3;
+  --on-surface-variant: #98a3bb;
+  --outline: #7a86a0;
+  --outline-variant: #39425a;
+  --card-border: #262f43;
+
+  --primary: #7ba2f5;
+  --primary-deep: #1b2440;
+  --primary-soft: #1d2740;
+  --on-primary: #0d111c;
+  --on-primary-deep: #e8ebf3;
+  --primary-container: #7ba2f5;
+  --secondary: #7ba2f5;
+  --royal: #7ba2f5;
+
+  --success: #4ecb92;
+  --success-bg: #14301f;
+  --success-on: #9fe6c3;
+  --warning: #e0a44f;
+  --warning-bg: #33260f;
+  --error: #f0797c;
+  --error-bg: #38191b;
+  --error-on: #f7b3b5;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-nav: 0 -1px 12px rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 4px 40px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -74,7 +182,7 @@ body {
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: #dfe3e7;
+  background: var(--background);
   color: var(--on-surface);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -127,7 +235,7 @@ a {
   top: 0;
   z-index: 20;
   background: var(--primary-deep);
-  color: var(--on-primary);
+  color: var(--on-primary-deep);
   padding: 16px var(--page-margin);
   display: flex;
   align-items: center;
@@ -175,7 +283,7 @@ a {
   gap: 10px;
 }
 .appbar__backbtn {
-  color: #fff;
+  color: var(--on-primary-deep);
   display: grid;
   place-items: center;
   width: 32px;
@@ -244,10 +352,10 @@ a {
 }
 .btn--primary {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 .btn--primary:hover:not(:disabled) {
-  background: #16304f;
+  background: var(--primary-hover);
 }
 .btn--block {
   width: 100%;
@@ -259,7 +367,7 @@ a {
 }
 .btn--danger {
   background: var(--error);
-  color: #fff;
+  color: var(--on-error);
 }
 .btn--subtle {
   background: var(--surface-container);
@@ -612,7 +720,7 @@ a {
   height: 52px;
   border-radius: var(--radius-full);
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   display: grid;
   place-items: center;
   margin-top: -22px;
@@ -654,7 +762,7 @@ a {
   display: grid;
   place-items: center;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font-weight: 700;
 }
 
@@ -663,8 +771,8 @@ a {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 2.5px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  border: 2.5px solid color-mix(in srgb, var(--on-primary) 35%, transparent);
+  border-top-color: var(--on-primary);
   animation: spin 0.7s linear infinite;
 }
 .spinner--dark {
@@ -767,34 +875,59 @@ a {
 .admin-shell {
   display: flex;
   min-height: 100vh;
-  background: var(--surface);
+  background: var(--background);
+}
+
+/* Above this width the console stops filling the viewport and becomes a sheet
+   lifted off the page, which is what gives the layout its air. Below it the
+   inset would just eat space the tables need. */
+@media (min-width: 1180px) {
+  .admin-shell {
+    padding: 22px;
+    gap: 0;
+  }
+  .admin-shell > .admin-sidebar {
+    border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+    height: calc(100vh - 44px);
+  }
+  .admin-shell > .admin-main {
+    border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+    height: calc(100vh - 44px);
+  }
+  .admin-shell > .admin-sidebar,
+  .admin-shell > .admin-main {
+    box-shadow: var(--shadow-float);
+  }
 }
 
 /* ---------- Sidebar ---------- */
 .admin-sidebar {
-  width: 250px;
+  width: 252px;
   flex-shrink: 0;
   position: sticky;
   top: 0;
   height: 100vh;
-  background: var(--primary-deep);
-  color: var(--on-primary);
+  background: var(--surface);
+  color: var(--on-surface);
+  border-right: 1px solid var(--card-border);
   display: flex;
   flex-direction: column;
-  padding: 22px 16px;
+  padding: 22px 14px;
 }
 .admin-sidebar__brand {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 4px 8px 24px;
+  padding: 4px 8px 22px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--card-border);
 }
 .admin-sidebar__logo {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   flex-shrink: 0;
   border-radius: var(--radius-full);
-  background: #fff;
+  background: var(--surface-container-low);
 }
 .admin-sidebar__title {
   font-size: 16px;
@@ -805,7 +938,7 @@ a {
 .admin-sidebar__subtitle {
   font-size: 10.5px;
   font-weight: 500;
-  opacity: 0.7;
+  color: var(--on-surface-variant);
   letter-spacing: 0.02em;
 }
 
@@ -815,30 +948,43 @@ a {
   gap: 4px;
 }
 .admin-navitem {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 11px 14px;
   border-radius: var(--radius-sm);
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--on-surface-variant);
   font-size: 14px;
   font-weight: 500;
   transition: background 0.12s ease, color 0.12s ease;
 }
 .admin-navitem:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: var(--surface-container-low);
+  color: var(--on-surface);
 }
 .admin-navitem--active {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: var(--primary-soft);
+  color: var(--primary);
   font-weight: 600;
+}
+/* A rail on the active item, so the current section is findable without
+   relying on the fill alone -- which is faint by design in both themes. */
+.admin-navitem--active::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  background: var(--primary);
 }
 
 .admin-sidebar__footer {
   margin-top: auto;
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid var(--card-border);
 }
 .admin-sidebar__scope {
   display: inline-block;
@@ -846,8 +992,8 @@ a {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--primary-soft);
+  color: var(--primary);
   padding: 4px 10px;
   border-radius: var(--radius-full);
   margin-bottom: 14px;
@@ -870,7 +1016,7 @@ a {
 }
 .admin-sidebar__userrole {
   font-size: 11px;
-  opacity: 0.65;
+  color: var(--on-surface-variant);
 }
 
 /* ---------- Content area ---------- */
@@ -879,6 +1025,7 @@ a {
   min-width: 0;
   height: 100vh;
   overflow-y: auto;
+  background: var(--surface);
 }
 .admin-content {
   max-width: 1080px;
@@ -887,8 +1034,44 @@ a {
 }
 /* In the wide console the stats read as a KPI row rather than the stacked
    mobile grid (the full-width spans are dropped for admins in Dashboard.tsx). */
+/* One container split by hairlines, rather than a row of cards. The figures
+   belong to a single reading of the same data, and separate cards imply four
+   unrelated things. */
 .admin-content .stat-grid {
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.admin-content .stat {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 18px 22px;
+  /* Hairline between cells; the leftmost has none. */
+  box-shadow: inset 1px 0 0 var(--card-border);
+}
+.admin-content .stat:first-child {
+  box-shadow: none;
+}
+/* Label above the figure, as a caption to it. The markup puts the value
+   first because the mobile card leads with it. */
+.admin-content .stat {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 6px;
+}
+.admin-content .stat__label {
+  margin-top: 0;
+}
+.admin-content .stat__value {
+  font-size: 34px;
+  letter-spacing: -0.025em;
 }
 
 /* ---------- Record detail (two-column) ---------- */
@@ -1266,4 +1449,51 @@ a {
   background: var(--warning-bg);
   color: var(--warning);
   border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+}
+
+/* ============================================================
+   Theme toggle — light / dark / match device
+   ============================================================ */
+.themetoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: var(--surface-container-low);
+  border: 1px solid var(--card-border);
+}
+
+.themetoggle__opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 0;
+  background: none;
+  border-radius: var(--radius-full);
+  color: var(--on-surface-variant);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.themetoggle__opt:hover {
+  color: var(--on-surface);
+}
+
+.themetoggle__opt--on {
+  background: var(--surface-container-lowest);
+  color: var(--primary);
+  box-shadow: var(--shadow-card);
+}
+
+.themetoggle__opt:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.themetoggle--compact .themetoggle__opt {
+  padding: 6px 8px;
 }
