@@ -5,7 +5,6 @@ import { useScans } from '../hooks/useScans'
 import { Avatar, Banner, EmptyState, Spinner, StatusPill } from '../components/ui'
 import { ChevronRight, InboxIcon, ScanIcon } from '../components/Icons'
 import { fieldLabel, formatDateShort, scanTitle, topBreach, violationCount } from '../lib/format'
-import { ActivityChart, ComplianceSplit } from '../components/Charts'
 
 export default function Dashboard() {
   const { googleName, avatarUrl, isAdmin } = useAuth()
@@ -14,6 +13,8 @@ export default function Dashboard() {
 
   const firstName = googleName.split(' ')[0]
   const total = scans.length
+  const compliant = scans.filter((s) => (s.status || '').toLowerCase() === 'compliant').length
+  const flagged = total - compliant
   const recent = scans.slice(0, 5)
 
   // Which rule the market breaches most. Admin-only: across one officer's own
@@ -50,16 +51,22 @@ export default function Dashboard() {
 
       {error && <Banner kind="error">Couldn’t load scans: {error}</Banner>}
 
-      {/* The headline count stays a figure; the split and the activity are
-          shapes, because "11 and 1" makes the reader do the division and a
-          list of days makes them do the trend. */}
+      {/* Stats */}
       <div className="stat-grid">
-        <div className="stat stat--accent" style={{ gridColumn: '1 / -1' }}>
+        <div className="stat stat--accent">
           <div className="stat__value">{loading ? '—' : total}</div>
           <div className="stat__label">{isAdmin ? 'Total inspections' : 'Your inspections'}</div>
         </div>
+        <div className="stat stat--success">
+          <div className="stat__value">{loading ? '—' : compliant}</div>
+          <div className="stat__label">Compliant</div>
+        </div>
+        <div className="stat stat--error" style={isAdmin ? undefined : { gridColumn: '1 / -1' }}>
+          <div className="stat__value">{loading ? '—' : flagged}</div>
+          <div className="stat__label">Flagged for violations</div>
+        </div>
         {!loading && breach && (
-          <div className="stat stat--accent" style={{ gridColumn: '1 / -1' }}>
+          <div className="stat stat--accent" style={isAdmin ? undefined : { gridColumn: '1 / -1' }}>
             <div className="stat__value">{breach.ruleRef}</div>
             <div className="stat__label">
               Most-breached rule · {fieldLabel(breach.field)} · {breach.share}% of flagged packages
@@ -67,13 +74,6 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-
-      {!loading && total > 0 && (
-        <div className="chart-row">
-          <ComplianceSplit scans={scans} />
-          <ActivityChart scans={scans} />
-        </div>
-      )}
 
       {/* Recent */}
       <div>

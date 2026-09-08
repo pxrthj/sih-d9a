@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { Avatar, Spinner } from '../components/ui'
 import { LogoutIcon, ShieldIcon } from '../components/Icons'
-import ThemeToggle from '../components/ThemeToggle'
 
 export default function Profile() {
   const { googleName, googleEmail, avatarUrl, profile, isAdmin, signOut } = useAuth()
@@ -50,13 +49,6 @@ export default function Profile() {
           <div className="field__value" style={{ textTransform: 'capitalize' }}>
             {profile?.status || '—'}
           </div>
-        </div>
-      </div>
-
-      <div>
-        <div className="section-label">Appearance</div>
-        <div className="card">
-          <ThemeToggle />
         </div>
       </div>
 

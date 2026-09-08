@@ -2,7 +2,6 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { HomeIcon, HistoryIcon, UsersIcon, ProfileIcon, MonitorIcon, MapPinIcon, AlertIcon } from './Icons'
 import { Avatar } from './ui'
-import ThemeToggle from './ThemeToggle'
 import logo from '../assets/logo.png'
 
 // The admin console is a desktop-only surface. Officers keep the mobile app
@@ -44,7 +43,6 @@ function Sidebar() {
       </nav>
 
       <div className="admin-sidebar__footer">
-        <ThemeToggle compact />
         <span className="admin-sidebar__scope">Admin</span>
         <div className="admin-sidebar__user">
           <Avatar src={avatarUrl} name={googleName} size={36} />

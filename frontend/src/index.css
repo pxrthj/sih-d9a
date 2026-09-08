@@ -24,18 +24,6 @@
   --primary: #1a365d;
   --primary-deep: #002045;
   --on-primary: #ffffff;
-  /* Text on --primary-deep, kept separate from --on-primary. In light both are
-     white so one token appears to do; in dark they must be opposites, because
-     the button fill lightens (wanting dark ink) while the app bar stays deep
-     navy (wanting light ink). Merging them makes the app bar title invisible. */
-  --on-primary-deep: #ffffff;
-  --primary-hover: #16304f;
-  --on-error: #ffffff;
-  --info-bg: #e6f0fb;
-  --info-on: #1a365d;
-  --info-border: #c9ddf5;
-  --success-border: #bbf7d0;
-  --error-border: #fecaca;
   --primary-container: #1a365d;
   --secondary: #1960a3;
   --royal: #2b6cb0;
@@ -73,117 +61,6 @@
   color-scheme: light;
 }
 
-/* ------------------------------------------------------------------
-   Dark theme.
-
-   Only colour tokens are redefined below; radii, layout and type are
-   theme-independent and stay declared once above. Resolution order:
-   the OS preference applies unless the reader explicitly chose light,
-   and an explicit choice beats the OS in either direction.
-   ------------------------------------------------------------------ */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-
-  /* Surfaces — the navy palette after dark, not a generic grey. */
-  --surface: #0f1727;
-  --background: #0b1220;
-  --surface-container-lowest: #131c2e;
-  --surface-container-low: #182236;
-  --surface-container: #1d283e;
-  --surface-container-high: #24314a;
-
-  --on-surface: #e6ebf3;
-  --on-surface-variant: #9aa8bd;
-  --outline: #7d8ba3;
-  --outline-variant: #35425c;
-  --card-border: #222e45;
-
-  /* The brand navy is already near-black, so on a dark ground it has to move
-     the other way: a lifted blue for anything that must read as brand. The app
-     bar keeps a deep navy, which is why it needs its own ink token. */
-  --primary: #7ea9e0;
-  --primary-deep: #0b1626;
-  --on-primary: #0b1220;
-  --on-primary-deep: #e6ebf3;
-  --primary-hover: #a3c4ec;
-  --primary-container: #7ea9e0;
-  --secondary: #7ea9e0;
-  --royal: #7ea9e0;
-
-  /* Verdict colours, re-picked against the dark surface rather than inverted:
-     the light greens and reds go muddy and stop reading as a verdict. */
-  --success: #45c07d;
-  --success-bg: #10291c;
-  --success-on: #a7e8c4;
-  --warning: #e0a44f;
-  --warning-bg: #33260f;
-  --error: #ef767a;
-  --error-bg: #351a1c;
-  --error-on: #f6b0b2;
-  --on-error: #2a0f10;
-  --info-bg: #16233a;
-  --info-on: #a8c6ea;
-  --info-border: #24395c;
-  --success-border: #1d4733;
-  --error-border: #4d2427;
-  --info-bg: #16233a;
-  --info-on: #a8c6ea;
-  --info-border: #24395c;
-  --success-border: #1d4733;
-  --error-border: #4d2427;
-
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.32), 0 6px 18px rgba(0, 0, 0, 0.28);
-  --shadow-nav: 0 -1px 12px rgba(0, 0, 0, 0.42);
-  }
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-
-  /* Surfaces — the navy palette after dark, not a generic grey. */
-  --surface: #0f1727;
-  --background: #0b1220;
-  --surface-container-lowest: #131c2e;
-  --surface-container-low: #182236;
-  --surface-container: #1d283e;
-  --surface-container-high: #24314a;
-
-  --on-surface: #e6ebf3;
-  --on-surface-variant: #9aa8bd;
-  --outline: #7d8ba3;
-  --outline-variant: #35425c;
-  --card-border: #222e45;
-
-  /* The brand navy is already near-black, so on a dark ground it has to move
-     the other way: a lifted blue for anything that must read as brand. The app
-     bar keeps a deep navy, which is why it needs its own ink token. */
-  --primary: #7ea9e0;
-  --primary-deep: #0b1626;
-  --on-primary: #0b1220;
-  --on-primary-deep: #e6ebf3;
-  --primary-hover: #a3c4ec;
-  --primary-container: #7ea9e0;
-  --secondary: #7ea9e0;
-  --royal: #7ea9e0;
-
-  /* Verdict colours, re-picked against the dark surface rather than inverted:
-     the light greens and reds go muddy and stop reading as a verdict. */
-  --success: #45c07d;
-  --success-bg: #10291c;
-  --success-on: #a7e8c4;
-  --warning: #e0a44f;
-  --warning-bg: #33260f;
-  --error: #ef767a;
-  --error-bg: #351a1c;
-  --error-on: #f6b0b2;
-  --on-error: #2a0f10;
-
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.32), 0 6px 18px rgba(0, 0, 0, 0.28);
-  --shadow-nav: 0 -1px 12px rgba(0, 0, 0, 0.42);
-}
-
-
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -197,7 +74,7 @@ body {
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: var(--background);
+  background: #dfe3e7;
   color: var(--on-surface);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -250,7 +127,7 @@ a {
   top: 0;
   z-index: 20;
   background: var(--primary-deep);
-  color: var(--on-primary-deep);
+  color: var(--on-primary);
   padding: 16px var(--page-margin);
   display: flex;
   align-items: center;
@@ -298,7 +175,7 @@ a {
   gap: 10px;
 }
 .appbar__backbtn {
-  color: var(--on-primary-deep);
+  color: #fff;
   display: grid;
   place-items: center;
   width: 32px;
@@ -367,10 +244,10 @@ a {
 }
 .btn--primary {
   background: var(--primary);
-  color: var(--on-primary);
+  color: #fff;
 }
 .btn--primary:hover:not(:disabled) {
-  background: var(--primary-hover);
+  background: #16304f;
 }
 .btn--block {
   width: 100%;
@@ -382,7 +259,7 @@ a {
 }
 .btn--danger {
   background: var(--error);
-  color: var(--on-error);
+  color: #fff;
 }
 .btn--subtle {
   background: var(--surface-container);
@@ -735,7 +612,7 @@ a {
   height: 52px;
   border-radius: var(--radius-full);
   background: var(--primary);
-  color: var(--on-primary);
+  color: #fff;
   display: grid;
   place-items: center;
   margin-top: -22px;
@@ -777,7 +654,7 @@ a {
   display: grid;
   place-items: center;
   background: var(--primary);
-  color: var(--on-primary);
+  color: #fff;
   font-weight: 700;
 }
 
@@ -786,8 +663,8 @@ a {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 2.5px solid color-mix(in srgb, var(--on-primary) 35%, transparent);
-  border-top-color: var(--on-primary);
+  border: 2.5px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
   animation: spin 0.7s linear infinite;
 }
 .spinner--dark {
@@ -820,17 +697,17 @@ a {
 .banner--error {
   background: var(--error-bg);
   color: var(--error-on);
-  border: 1px solid var(--error-border);
+  border: 1px solid #fecaca;
 }
 .banner--info {
-  background: var(--info-bg);
-  color: var(--info-on);
-  border: 1px solid var(--info-border);
+  background: #e6f0fb;
+  color: var(--primary);
+  border: 1px solid #c9ddf5;
 }
 .banner--success {
   background: var(--success-bg);
   color: var(--success-on);
-  border: 1px solid var(--success-border);
+  border: 1px solid #bbf7d0;
 }
 
 /* ---------- Filter tabs ---------- */
@@ -901,7 +778,7 @@ a {
   top: 0;
   height: 100vh;
   background: var(--primary-deep);
-  color: var(--on-primary-deep);
+  color: var(--on-primary);
   display: flex;
   flex-direction: column;
   padding: 22px 16px;
@@ -1390,213 +1267,3 @@ a {
   color: var(--warning);
   border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
 }
-
-/* ============================================================
-   Theme toggle — light / dark / match device
-   Three states, not a switch: "match device" is a distinct intent from
-   either fixed choice, and a two-way toggle cannot express it.
-   ============================================================ */
-.themetoggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border-radius: var(--radius-full);
-  background: var(--surface-container-low);
-  border: 1px solid var(--card-border);
-}
-.themetoggle__opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 11px;
-  border: 0;
-  background: none;
-  border-radius: var(--radius-full);
-  color: var(--on-surface-variant);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.themetoggle__opt:hover { color: var(--on-surface); }
-.themetoggle__opt--on {
-  background: var(--surface-container-lowest);
-  color: var(--primary);
-  box-shadow: var(--shadow-card);
-}
-.themetoggle__opt:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.themetoggle--compact .themetoggle__opt { padding: 6px 8px; }
-/* The admin sidebar is deep navy in both themes, so the control sits on a
-   translucent well rather than the page surface. */
-.admin-sidebar__footer .themetoggle {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.16);
-  margin-bottom: 12px;
-}
-.admin-sidebar__footer .themetoggle__opt { color: rgba(255, 255, 255, 0.72); }
-.admin-sidebar__footer .themetoggle__opt:hover { color: #fff; }
-.admin-sidebar__footer .themetoggle__opt--on {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
-  box-shadow: none;
-}
-
-/* ============================================================
-   Dashboard charts
-   Marks take the compliance tokens, and chart text takes ink tokens —
-   never the series colour — so both themes stay legible.
-   ============================================================ */
-.chart-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.chart-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-.chart-title {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--on-surface-variant);
-}
-.chart-note {
-  font-size: 12px;
-  color: var(--on-surface-variant);
-  font-variant-numeric: tabular-nums;
-}
-.chart-empty {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--on-surface-variant);
-  padding: 10px 0 4px;
-}
-
-/* ---------- proportion bar ---------- */
-.splitbar {
-  display: flex;
-  gap: 2px;                      /* the surface gap that keeps segments distinct */
-  height: 14px;
-  width: 100%;
-}
-.splitbar__seg {
-  height: 100%;
-  border-radius: var(--radius-full);
-  min-width: 4px;
-}
-.splitbar__seg--ok { background: var(--success); }
-.splitbar__seg--bad { background: var(--error); }
-
-/* ---------- legend ---------- */
-.chart-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  font-size: 12.5px;
-  color: var(--on-surface-variant);
-}
-.chart-legend__item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-.chart-legend__item b {
-  color: var(--on-surface);
-  font-variant-numeric: tabular-nums;
-}
-.chart-legend__pct {
-  color: var(--on-surface-variant);
-  font-variant-numeric: tabular-nums;
-}
-.chart-legend__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 3px;
-  flex: none;
-}
-.chart-legend__dot--ok { background: var(--success); }
-.chart-legend__dot--bad { background: var(--error); }
-.chart-legend__dot--brand { background: var(--primary); }
-
-/* ---------- activity columns ---------- */
-.chart-scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-.activity {
-  display: block;
-  height: 114px;
-  width: 100%;
-  min-width: 280px;
-}
-.activity__axis {
-  stroke: var(--outline-variant);
-  stroke-width: 1;
-}
-.activity__bar {
-  fill: var(--primary);
-  opacity: 0.85;
-  transition: opacity 0.12s ease;
-}
-.activity__bar.is-hover { opacity: 1; }
-.activity__bar--flagged { fill: var(--error); }
-.activity__axislabels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--on-surface-variant);
-  margin-top: -4px;
-}
-
-/* The console has room to set the two figures side by side. */
-.chart-row {
-  display: grid;
-  gap: 12px;
-}
-@media (min-width: 900px) {
-  .chart-row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
-  }
-}
-
-/* ============================================================
-   Extracted declarations — paired layout
-   Dividers are drawn with border-TOP and dropped on the first cell, so a
-   two-column row shows one continuous rule and the last row has no
-   trailing line under it.
-   ============================================================ */
-.fieldgrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  column-gap: 28px;
-}
-.fieldgrid .field {
-  border-bottom: none;
-  border-top: 1px solid var(--card-border);
-  min-width: 0;
-}
-.fieldgrid .field:first-child {
-  border-top: none;
-}
-/* Long values wrap inside their cell rather than widening the grid. */
-.fieldgrid .field__value {
-  overflow-wrap: anywhere;
-}
-
-@media (min-width: 720px) {
-  .fieldgrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .fieldgrid .field--wide {
-    grid-column: 1 / -1;
-  }
-  .fieldgrid .field:nth-child(2) {
-    border-top: none;
-  }
-}
-.chart-legend__sep { color: var(--on-surface-variant); }
